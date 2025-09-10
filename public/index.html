@@ -1,0 +1,1823 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rejestr logowania pracowników</title>
+  <!-- For internal use only Hultafors Group -->
+  <style>
+    :root{
+      --bg:#f6f8fb; --fg:#0f172a; --muted:#64748b; --card:#ffffff;
+      --primary:#2563eb; --primary-600:#1d4ed8; --success:#16a34a; --danger:#dc2626;
+      --border:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--fg); }
+    .container{max-width:1200px; margin:24px auto; padding:0 16px}
+    header{display:flex; align-items:flex-end; justify-content:space-between; gap:12px}
+    header h1{margin:0; font-size:24px}
+    header p{margin:4px 0 0; color:var(--muted); font-size:14px}
+    .admin-bar{display:flex; gap:8px; align-items:center}
+    .grid{ display:grid; grid-template-columns: 360px 1fr; gap:16px; align-items:start; margin-top:16px; }
+    .right-grid{ display:grid; grid-template-columns: 1fr 360px 360px; gap:16px; align-items:start; }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+    label{display:block; font-size:14px; color:var(--muted); margin:8px 0 6px}
+    input[type="text"], input[type="password"], input[type="number"], select, input[type="time"]{
+      width:100%; padding:10px 12px; font-size:16px; border:1px solid var(--border); border-radius:8px; outline:none; background:#fff;
+    }
+    input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus, select:focus, input[type="time"]:focus{border-color:#c7d2fe; box-shadow:0 0 0 3px #e0e7ff}
+    .row{display:flex; gap:12px}
+    .buttons{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
+    button{ padding:10px 14px; border:0; border-radius:8px; font-weight:600; cursor:pointer; background:var(--primary); color:#fff; }
+    button:hover{background:var(--primary-600)}
+    button.secondary{background:#111827; color:#fff} button.secondary:hover{background:#0b1220}
+    button.ghost{background:#f1f5f9; color:#111827} button.ghost:hover{background:#e2e8f0}
+    button.small{padding:6px 10px; font-size:12px; border-radius:6px}
+    button.danger{background:var(--danger)} button.danger:hover{background:#b91c1c}
+    .msg{ margin-top:10px; padding:10px 12px; border-radius:8px; font-size:14px; display:none; }
+    .msg.show{display:block}
+    .msg.success{background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0}
+    .msg.error{background:#fef2f2; color:#991b1b; border:1px solid #fecaca}
+    .msg.warn{background:#fffbeb; color:#92400e; border:1px solid #fde68a}
+    .panel{margin-bottom:16px}
+    .panel h3{margin:0 0 8px 0; font-size:16px}
+    table{width:100%; border-collapse:collapse; font-size:14px; background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden}
+    thead{background:#f8fafc}
+    th, td{padding:10px 8px; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap}
+    tbody tr:hover{background:#f9fafb}
+    .muted{color:var(--muted)}
+    .tools{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap}
+    .footer{color:var(--muted); font-size:12px; margin-top:12px}
+    .admin{margin-top:16px}
+    .tabs{display:flex; gap:8px; border-bottom:1px solid var(--border); padding:0 0 8px; margin-bottom:12px}
+    .tabs button{background:#f1f5f9; color:#111827; border:1px solid var(--border); border-bottom:none; border-radius:8px 8px 0 0}
+    .tabs button.active{background:#fff; font-weight:700}
+    .admin-section{display:none}
+    .admin-section.active{display:block}
+    .hint{font-size:12px; color:var(--muted)}
+    .pill{display:inline-block; padding:2px 8px; font-size:12px; border-radius:999px; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe}
+    /* Charts */
+    .charts-grid{ display:grid; grid-template-columns: 1fr; gap:16px; }
+    .chart-card{ background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px; }
+    .chart-header{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+    @media (min-width: 1100px){ .charts-grid{ grid-template-columns: 1fr 1fr 1fr; } }
+    @media (max-width: 1100px){ .right-grid{grid-template-columns:1fr} }
+    @media (max-width: 900px){ .grid{grid-template-columns:1fr} }
+
+    /* Modal (admin login) */
+    .modal-backdrop{position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; z-index:2000; place-items:center; padding:16px}
+    .modal-backdrop.show{display:grid}
+    .modal-card{max-width:420px; width:100%; background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px}
+    .modal-card h3{margin:0 0 8px 0}
+    .modal-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:12px}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Rejestr logowania pracowników</h1>
+        <p>Logowanie kodem 1–999 na stanowisko. Limity, procesy, zlecenia, wyniki i wykresy w Panelu admina.</p>
+      </div>
+      <div class="admin-bar">
+        <span id="adminBadge" class="pill" style="display:none">ADMIN</span>
+        <button id="btnOpenAdmin" class="ghost">Panel administratora</button>
+        <button id="btnAdminLogout" class="secondary" style="display:none">Wyloguj admina</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Logowanie -->
+      <div class="card">
+        <label for="code">Kod pracownika (1–999)</label>
+        <input id="code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="np. 7 lub 123" autocomplete="one-time-code">
+        <label for="station">Stanowisko</label>
+        <select id="station"></select>
+        <div class="buttons">
+          <button id="btnLogin">Zaloguj</button>
+          <button id="btnLogout" class="secondary">Wyloguj</button>
+          <button id="btnClearCode" class="ghost">Wyczyść</button>
+        </div>
+        <div id="msg" class="msg"></div>
+        <div class="footer">
+          <ul>
+            <li>Kod musi być liczbą 1–999 i znajdować się na liście pracowników.</li>
+            <li>Zlecenia (7–10 cyfr) rejestruj w panelu po prawej — przypiszemy do procesu stanowiska.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Prawa kolumna -->
+      <div>
+        <div class="right-grid">
+          <div>
+            <div class="panel">
+              <h3>Aktywnie zalogowani</h3>
+              <table id="tblActivePublic">
+                <thead><tr><th>Pracownik</th><th>Stanowisko</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="hint" style="margin-top:6px">Szczegóły czasów i historia w Panelu Administratora.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Rejestracja zlecenia</h3>
+            <label for="ordEmpCode">Kod pracownika (1–999)</label>
+            <input id="ordEmpCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="np. 7 lub 123">
+            <label for="ordNumber">Numer zlecenia (7–10 cyfr)</label>
+            <input id="ordNumber" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="np. 0123456">
+            <div class="buttons">
+              <button id="btnAddOrder">Zapisz zlecenie</button>
+              <button id="btnClearOrder" class="ghost">Wyczyść</button>
+              <button id="btnClearActiveOrder" class="ghost">Wyczyść aktywne zlecenie</button>
+            </div>
+            <div id="orderMsg" class="msg"></div>
+          </div>
+
+          <div class="card">
+            <h3>Aktualne procesowane zlecenia</h3>
+            <table id="tblCurrentOrders">
+              <thead><tr><th>Pracownik</th><th>Proces</th><th>Zlecenie</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div class="hint" style="margin-top:6px">Pokazujemy ostatnio wpisane zlecenie z bieżącej sesji dla każdego zalogowanego użytkownika.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL ADMINA -->
+    <div id="adminPanel" class="admin card" style="display:none">
+      <div class="tabs">
+        <button class="tabBtn active" data-tab="tab-employees">Pracownicy</button>
+        <button class="tabBtn" data-tab="tab-stations">Stanowiska</button>
+        <button class="tabBtn" data-tab="tab-processes">Procesy</button>
+        <button class="tabBtn" data-tab="tab-import">Import</button>
+        <button class="tabBtn" data-tab="tab-order-mods">Modyfikacja zleceń</button>
+        <button class="tabBtn" data-tab="tab-results">Wyniki</button>
+        <button class="tabBtn" data-tab="tab-charts">Wykresy</button>
+        <button class="tabBtn" data-tab="tab-reports">Zalogowani</button>
+        <button class="tabBtn" data-tab="tab-settings">Ustawienia</button>
+      </div>
+
+      <!-- Pracownicy -->
+      <section id="tab-employees" class="admin-section active">
+        <div class="panel">
+          <h3>Lista pracowników</h3>
+          <div class="row" style="align-items:flex-end; margin-bottom:8px">
+            <div style="flex:0 0 160px">
+              <label for="newEmpCode">Nowy kod (1–999)</label>
+              <input id="newEmpCode" type="number" inputmode="numeric" min="1" max="999" placeholder="np. 7">
+            </div>
+            <div style="flex:1">
+              <label for="newEmpName">Imię i nazwisko</label>
+              <input id="newEmpName" type="text" placeholder="np. Jan Kowalski">
+            </div>
+            <div><button id="btnAddEmployee">Dodaj</button></div>
+          </div>
+          <table id="tblEmployees">
+            <thead><tr><th>Kod</th><th>Imię i nazwisko</th><th>Aktywny</th><th>Usuń</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Stanowiska -->
+      <section id="tab-stations" class="admin-section">
+        <div class="panel">
+          <h3>Nazwy, procesy i limity stanowisk</h3>
+          <table id="tblStations">
+            <thead><tr><th>ID</th><th>Nazwa</th><th>Proces</th><th>Max osób</th><th>Aktywne</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="tools"><button id="btnStationsReset" class="ghost">Przywróć domyślne nazwy i limity</button></div>
+        </div>
+      </section>
+
+      <!-- Procesy -->
+      <section id="tab-processes" class="admin-section">
+        <div class="panel">
+          <h3>Procesy (np. Hafty, Szycie, Zgrzewy, Placement, Personal packaging)</h3>
+          <div class="row" style="align-items:flex-end; margin-bottom:8px">
+            <div style="flex:1"><label for="newProcName">Nazwa nowego procesu</label><input id="newProcName" type="text" placeholder="np. Placement"></div>
+            <div><button id="btnAddProcess">Dodaj proces</button></div>
+          </div>
+          <table id="tblProcesses">
+            <thead><tr><th>ID</th><th>Nazwa</th><th>Użycie</th><th>Usuń</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Import -->
+      <section id="tab-import" class="admin-section">
+        <div class="panel">
+          <h3>Import planu zleceń (Excel/CSV)</h3>
+          <div class="row" style="align-items:flex-end; flex-wrap:wrap">
+            <div style="flex:1; min-width:260px"><label for="importFile">Plik (.xlsx, .xls, .csv)</label><input id="importFile" type="file" accept=".xlsx,.xls,.csv" /></div>
+            <div><button id="btnImport">Wgraj</button><button id="btnClearImport" class="ghost">Wyczyść import</button></div>
+          </div>
+          <div id="importStatus" class="msg" style="margin-top:10px"></div>
+          <div class="hint" style="margin-top:6px">Kolumny: P – numer zlecenia, T – Hafty, U,V,X – Szycie, W – Zgrzewy oraz Placement, Y – Personal packaging.</div>
+        </div>
+        <div class="panel">
+          <h3>Normy (szt/h) — wymagane na proces</h3>
+          <table id="tblNorms">
+            <thead><tr><th>Proces</th><th>Norma [szt/h]</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Modyfikacja zleceń -->
+      <section id="tab-order-mods" class="admin-section">
+        <div class="panel">
+          <h3>Modyfikacja zleceń (korekta ilości w %)</h3>
+          <div class="row" style="align-items:flex-end; flex-wrap:wrap">
+            <div style="flex:1; min-width:260px"><label for="modOrderInput">Numer zlecenia (7–10 cyfr)</label><input id="modOrderInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="np. 0123456"></div>
+            <div class="buttons"><button id="btnModFind">Szukaj</button></div>
+          </div>
+          <div id="modMsg" class="msg" style="margin-top:10px"></div>
+          <table id="tblOrderMods">
+            <thead><tr><th>Proces</th><th>Ilość (import)</th><th>Korekta [%]</th><th>Ilość po korekcie</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="tools">
+            <button id="btnModSave">Zapisz</button>
+            <button id="btnModClearOrder" class="ghost">Wyczyść korekty dla tego zlecenia</button>
+            <button id="btnModClearAll" class="danger">Wyczyść wszystkie korekty</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Wyniki -->
+      <section id="tab-results" class="admin-section">
+        <div class="panel">
+          <h3>Wyniki pracowników — bieżący dzień (ilości × czas → % normy)</h3>
+          <table id="tblResults">
+            <thead><tr><th>Kod</th><th>Pracownik</th><th>Proces</th><th>Ilość (suma)</th><th>Czas [h:m:s]</th><th>Wynik [%]</th><th>Liczba zleceń</th><th>Zlecenia</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h3>Wyniki tygodniowe (Pn–Pt)</h3>
+          <table id="tblWeeklyResults">
+            <thead>
+              <tr>
+                <th>Kod</th><th>Pracownik</th><th>Ilość (suma)</th><th>Czas [h:m:s]</th><th>Wynik tygodniowy [%]</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="tools">
+            <button id="btnExportWeekly" class="ghost">Eksport CSV (wyniki tygodniowe)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Wykresy -->
+      <section id="tab-charts" class="admin-section">
+        <div class="panel">
+          <h3>Wykresy — bieżący dzień</h3>
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-header"><div>Ilość per proces (Hafty, Zgrzewy, Szycie) — bez korekt</div></div>
+              <canvas id="chProc" height="160"></canvas>
+              <div class="hint" style="margin-top:6px">Sumy z importu dla unikalnych zleceń z bieżącego dnia (okno wg Ustawień → Reset dnia — godzina); ignorujemy korekty.</div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header"><div>Średnia norma per proces (%)</div></div>
+              <canvas id="chAvgNorm" height="160"></canvas>
+              <div class="hint" style="margin-top:6px">Średnia z wyników% pracowników w procesie dla bieżącego dnia (okno wg godziny resetu).</div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header"><div>Produktywni vs nieproduktywni (czas dzienny, %)</div></div>
+              <canvas id="chProd" height="160"></canvas>
+              <div class="hint" style="margin-top:6px">Na podstawie czasu zalogowania z bieżącego dnia (z uwzględnieniem zamrożenia przerw). Wartości w % są na wykresie.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Wykresy — tydzień roboczy (Pn–Pt, reset Pt 23:59)</h3>
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-header"><div>Ilość per proces (Hafty, Zgrzewy, Szycie) — bez korekt</div></div>
+              <canvas id="chProcWeek" height="160"></canvas>
+              <div class="hint" style="margin-top:6px">Okres: pon 00:00 – pt 23:59 (bieżący tydzień); ignorujemy korekty.</div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header"><div>Średnia norma per proces (%)</div></div>
+              <canvas id="chAvgNormWeek" height="160"></canvas>
+              <div class="hint" style="margin-top:6px">Średnia z wyników% pracowników w procesie; okres: pon–pt (do 23:59) bieżącego tygodnia.</div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header"><div>Produktywni vs nieproduktywni (czas Pn–Pt, %)</div></div>
+              <canvas id="chProdWeek" height="160"></canvas>
+              <div class="hint" style="margin-top:6px">Na podstawie czasu zalogowania w oknie pon 00:00 – pt 23:59 (z uwzględnieniem zamrożenia przerw).</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Zalogowani -->
+      <section id="tab-reports" class="admin-section">
+        <div class="panel">
+          <h3>Aktywnie zalogowani (z czasem)</h3>
+          <table id="tblActiveAdmin">
+            <thead>
+              <tr>
+                <th>Kod</th><th>Pracownik</th><th>Stanowisko</th><th>Proces</th><th>Aktywne zlecenie</th><th>Start</th><th>Upływ</th><th>Akcja</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h3>Historia (dzisiaj — reset 23:59)</h3>
+          <table id="tblLogsAdmin">
+            <thead><tr><th>Kod</th><th>Pracownik</th><th>Stanowisko</th><th>Proces</th><th>Początek</th><th>Koniec</th><th>Czas</th></tr></thead>
+          <tbody></tbody>
+          </table>
+          <div class="tools"><button id="btnExport" class="ghost">Eksport CSV (czas + zlecenia)</button><button id="btnClearAll" class="danger">Wyczyść wszystko</button></div>
+        </div>
+      </section>
+
+      <!-- Ustawienia -->
+      <section id="tab-settings" class="admin-section">
+        <div class="panel">
+          <h3>Logowanie administratora — PIN</h3>
+          <div class="row" style="flex-wrap:wrap">
+            <div style="flex:1; min-width:220px"><label for="pinCurrent">Obecny PIN</label><input id="pinCurrent" type="password" inputmode="numeric" maxlength="12" placeholder="****"></div>
+            <div style="flex:1; min-width:220px"><label for="pinNew">Nowy PIN</label><input id="pinNew" type="password" inputmode="numeric" maxlength="12" placeholder="****"></div>
+            <div style="flex:1; min-width:220px"><label for="pinNew2">Powtórz nowy PIN</label><input id="pinNew2" type="password" inputmode="numeric" maxlength="12" placeholder="****"></div>
+          </div>
+          <div class="buttons"><button id="btnChangePin">Zmień PIN</button></div>
+          <div class="hint" style="margin-top:6px">PIN weryfikujemy po stronie przeglądarki (lekko, do pełnego bezpieczeństwa — backend).</div>
+        </div>
+
+        <div class="panel">
+          <h3>Reset dnia — godzina</h3>
+          <div class="row" style="flex-wrap:wrap; align-items:flex-end">
+            <div style="flex:0 0 200px; min-width:200px">
+              <label for="dailyResetTime">Godzina resetu (HH:MM)</label>
+              <input id="dailyResetTime" type="time" step="60" value="00:00">
+            </div>
+            <div><button id="btnSaveResetTime">Zapisz</button></div>
+          </div>
+          <div class="hint" style="margin-top:6px">O tej godzinie zaczyna się „dzień roboczy” używany w wykresach dziennych i tabeli „Wyniki pracowników”.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Tryb przydzielania ilości</h3>
+          <div class="row" style="flex-wrap:wrap; align-items:center; gap:16px">
+            <label><input type="radio" name="allocMode" id="allocModeProportional" value="proportional"> Proporcjonalnie do czasu</label>
+            <label><input type="radio" name="allocMode" id="allocModeFull" value="full"> Pełne zlecenie</label>
+            <div><button id="btnSaveAllocMode">Zapisz</button></div>
+          </div>
+          <div class="hint" style="margin-top:6px">
+            - Proporcjonalnie: ilość dzielimy wg udziału czasu na zleceniu (zalecane).<br>
+            - Pełne zlecenie: każdy, kto wpisał numer, dostaje pełną ilość (z deduplikacją wielokrotnych wpisów).
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Przydzielanie ilości po czasie — próg minimalny</h3>
+          <div class="row" style="flex-wrap:wrap; align-items:flex-end">
+            <div style="flex:1; min-width:260px">
+              <label for="minSegRange">Minimalny odcinek pracy na zleceniu [s] (ignorowany poniżej progu)</label>
+              <input id="minSegRange" type="range" min="0" max="600" step="10">
+              <div class="hint">Aktualnie: <span id="minSegValue">60</span> s</div>
+            </div>
+            <div style="flex:0 0 140px">
+              <label for="minSegNumber">Wartość (dokładnie)</label>
+              <input id="minSegNumber" type="number" min="0" max="3600" step="10">
+            </div>
+            <div><button id="btnSaveMinSeg">Zapisz</button></div>
+          </div>
+          <div class="hint" style="margin-top:6px">Dotyczy tylko trybu „Proporcjonalnie do czasu”. Sugerowane 60–120 s.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Odświeżanie aplikacji</h3>
+          <div class="row" style="flex-wrap:wrap; align-items:flex-end">
+            <div style="flex:1; min-width:260px">
+              <label for="refreshIntervalRange">Częstotliwość odświeżania [min] (1–10)</label>
+              <input id="refreshIntervalRange" type="range" min="1" max="10" step="1">
+              <div class="hint">Aktualnie: <span id="refreshIntervalValue">1</span> min</div>
+            </div>
+            <div style="flex:0 0 140px">
+              <label for="refreshIntervalNumber">Wartość (dokładnie)</label>
+              <input id="refreshIntervalNumber" type="number" min="1" max="10" step="1">
+            </div>
+            <div><button id="btnSaveRefreshInterval">Zapisz</button></div>
+          </div>
+          <div class="hint" style="margin-top:6px">Określa, co ile minut cała aplikacja wykona automatyczne odświeżenie danych i wykresów.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Rejestracja zlecenia — walidacja względem importu</h3>
+          <div class="row" style="flex-wrap:wrap; align-items:center; gap:16px">
+            <label><input type="radio" name="ordValMode" id="ordValWarn" value="warn"> Ostrzegaj (dodawaj mimo braku/0)</label>
+            <label><input type="radio" name="ordValMode" id="ordValBlock" value="block"> Blokuj (nie dodawaj)</label>
+            <div><button id="btnSaveOrderValidation">Zapisz</button></div>
+          </div>
+          <div class="hint" style="margin-top:6px">Dotyczy sytuacji, gdy zlecenie nie istnieje w imporcie lub ma 0 szt. w bieżącym procesie.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Liczba stanowisk</h3>
+          <div class="row" style="flex-wrap:wrap; align-items:flex-end">
+            <div style="flex:1; min-width:260px">
+              <label for="stationCountRange">Liczba stanowisk (1–30)</label>
+              <input id="stationCountRange" type="range" min="1" max="30" step="1">
+              <div class="hint">Aktualnie: <span id="stationCountValue">30</span></div>
+            </div>
+            <div style="flex:0 0 140px">
+              <label for="stationCountNumber">Wartość (dokładnie)</label>
+              <input id="stationCountNumber" type="number" min="1" max="30" step="1">
+            </div>
+            <div><button id="btnSaveStationCount">Zastosuj</button></div>
+          </div>
+          <div class="hint" style="margin-top:6px">Zmiana w dół jest zablokowana, jeżeli ktoś jest zalogowany na stanowisku, które miałoby zostać usunięte.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Auto wylogowanie wszystkich — godzina</h3>
+          <div class="row" style="flex-wrap:wrap; align-items:flex-end">
+            <div style="flex:0 0 200px; min-width:200px">
+              <label for="autoLogoutTime">Godzina (HH:MM)</label>
+              <input id="autoLogoutTime" type="time" step="60">
+            </div>
+            <div><button id="btnSaveAutoLogout">Zapisz</button></div>
+          </div>
+          <div class="hint" style="margin-top:6px">O tej godzinie system automatycznie wyloguje wszystkich aktywnych użytkowników (raz dziennie).</div>
+        </div>
+
+        <div class="panel">
+          <h3>Przerwy — zamrożenie czasu</h3>
+          <div class="row" style="flex-wrap:wrap; align-items:flex-end; gap:16px">
+            <div style="flex:0 0 200px; min-width:200px">
+              <label for="break1StartTime">Przerwa 1 — początek (HH:MM)</label>
+              <input id="break1StartTime" type="time" step="60">
+            </div>
+            <div style="flex:0 0 200px; min-width:200px">
+              <label for="break1EndTime">Przerwa 1 — koniec (HH:MM)</label>
+              <input id="break1EndTime" type="time" step="60">
+            </div>
+          </div>
+          <div class="row" style="flex-wrap:wrap; align-items:flex-end; gap:16px; margin-top:8px">
+            <div style="flex:0 0 200px; min-width:200px">
+              <label for="break2StartTime">Przerwa 2 — początek (HH:MM)</label>
+              <input id="break2StartTime" type="time" step="60">
+            </div>
+            <div style="flex:0 0 200px; min-width:200px">
+              <label for="break2EndTime">Przerwa 2 — koniec (HH:MM)</label>
+              <input id="break2EndTime" type="time" step="60">
+            </div>
+            <div><button id="btnSaveBreakTimes">Zapisz</button></div>
+          </div>
+          <div class="hint" style="margin-top:6px">W podanych przedziałach czas jest “zamrożony” — nie liczy się do wyników, wykresów i upływu sesji.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Modal logowania admina -->
+  <div id="adminLoginModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card">
+      <h3>Logowanie administratora</h3>
+      <label for="adminPinInput">PIN administratora</label>
+      <input id="adminPinInput" type="password" inputmode="numeric" maxlength="12" placeholder="****" />
+      <div id="adminLoginMsg" class="msg" style="margin-top:10px"></div>
+      <div class="modal-actions"><button id="btnAdminCancel" class="ghost">Anuluj</button><button id="btnAdminLogin">Zaloguj</button></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  function $(sel){ return document.querySelector(sel); }
+
+  const KEYS = {
+    totals:'worklog_totals_v3', active:'worklog_active_v3', logs:'worklog_logs_v4',
+    employees:'worklog_employees_v2', stations:'worklog_stations_v4', processes:'worklog_processes_v1',
+    orders:'worklog_orders_v1', import:'worklog_import_v1', norms:'worklog_norms_v1',
+    orderMods:'worklog_orderMods_v1', config:'worklog_config_v2'
+  };
+
+  const els = {
+    code:$('#code'), station:$('#station'), btnLogin:$('#btnLogin'), btnLogout:$('#btnLogout'), btnClearCode:$('#btnClearCode'), msg:$('#msg'),
+    tblActivePublic:$('#tblActivePublic tbody'),
+    ordEmpCode:$('#ordEmpCode'), ordNumber:$('#ordNumber'), btnAddOrder:$('#btnAddOrder'), btnClearOrder:$('#btnClearOrder'), btnClearActiveOrder:$('#btnClearActiveOrder'), orderMsg:$('#orderMsg'), tblCurrentOrders:$('#tblCurrentOrders tbody'),
+    adminPanel:$('#adminPanel'), btnOpenAdmin:$('#btnOpenAdmin'), btnAdminLogout:$('#btnAdminLogout'), adminBadge:$('#adminBadge'),
+    tabButtons:document.querySelectorAll('.tabBtn'),
+    newEmpCode:$('#newEmpCode'), newEmpName:$('#newEmpName'), btnAddEmployee:$('#btnAddEmployee'), tblEmployees:$('#tblEmployees tbody'),
+    tblStations:$('#tblStations tbody'), btnStationsReset:$('#btnStationsReset'),
+    newProcName:$('#newProcName'), btnAddProcess:$('#btnAddProcess'), tblProcesses:$('#tblProcesses tbody'),
+    importFile:$('#importFile'), btnImport:$('#btnImport'), btnClearImport:$('#btnClearImport'), importStatus:$('#importStatus'), tblNorms:$('#tblNorms tbody'),
+    modOrderInput:$('#modOrderInput'), btnModFind:$('#btnModFind'), modMsg:$('#modMsg'), tblOrderMods:$('#tblOrderMods tbody'), btnModSave:$('#btnModSave'), btnModClearOrder:$('#btnModClearOrder'), btnModClearAll:$('#btnModClearAll'),
+    tblResults:$('#tblResults tbody'),
+    tblWeeklyResults:$('#tblWeeklyResults tbody'), btnExportWeekly:$('#btnExportWeekly'),
+    tblActiveAdmin:$('#tblActiveAdmin tbody'), tblLogsAdmin:$('#tblLogsAdmin tbody'), btnExport:$('#btnExport'), btnClearAll:$('#btnClearAll'),
+    pinCurrent:$('#pinCurrent'), pinNew:$('#pinNew'), pinNew2:$('#pinNew2'), btnChangePin:$('#btnChangePin'),
+    adminLoginModal:$('#adminLoginModal'), adminPinInput:$('#adminPinInput'), adminLoginMsg:$('#adminLoginMsg'), btnAdminCancel:$('#btnAdminCancel'), btnAdminLogin:$('#btnAdminLogin'),
+    chProc:$('#chProc'), chAvgNorm:$('#chAvgNorm'), chProd:$('#chProd'),
+    chProcWeek:$('#chProcWeek'), chAvgNormWeek:$('#chAvgNormWeek'), chProdWeek:$('#chProdWeek'),
+    dailyResetTime:$('#dailyResetTime'), btnSaveResetTime:$('#btnSaveResetTime'),
+    minSegRange:$('#minSegRange'), minSegNumber:$('#minSegNumber'), minSegValue:$('#minSegValue'), btnSaveMinSeg:$('#btnSaveMinSeg'),
+    allocModeProportional:$('#allocModeProportional'), allocModeFull:$('#allocModeFull'), btnSaveAllocMode:$('#btnSaveAllocMode'),
+    autoLogoutTime:$('#autoLogoutTime'), btnSaveAutoLogout:$('#btnSaveAutoLogout'),
+    break1StartTime:$('#break1StartTime'), break1EndTime:$('#break1EndTime'),
+    break2StartTime:$('#break2StartTime'), break2EndTime:$('#break2EndTime'), btnSaveBreakTimes:$('#btnSaveBreakTimes'),
+    // Odświeżanie
+    refreshIntervalRange:$('#refreshIntervalRange'),
+    refreshIntervalNumber:$('#refreshIntervalNumber'),
+    refreshIntervalValue:$('#refreshIntervalValue'),
+    btnSaveRefreshInterval:$('#btnSaveRefreshInterval'),
+    // Walidacja zlecenia
+    ordValWarn:$('#ordValWarn'), ordValBlock:$('#ordValBlock'), btnSaveOrderValidation:$('#btnSaveOrderValidation'),
+    // Liczba stanowisk
+    stationCountRange:$('#stationCountRange'),
+    stationCountNumber:$('#stationCountNumber'),
+    stationCountValue:$('#stationCountValue'),
+    btnSaveStationCount:$('#btnSaveStationCount'),
+  };
+
+  const state = {
+    totals:{}, active:{}, logs:[], employees:{}, stations:[], processes:[],
+    orders:[], importData:{rows:{}, fileName:'', ts:0, count:0},
+    norms:{}, orderMods:{}, config:{
+      adminPinHash:'', dailyResetHHmm:'00:00', minSegSec:60, allocMode:'proportional',
+      autoLogoutHHmm:'', break1StartHHmm:'', break1EndHHmm:'', break2StartHHmm:'', break2EndHHmm:'',
+      refreshIntervalMin:1,
+      orderValidationMode:'warn',
+      stationCount:30
+    }
+  };
+  let isAdmin=false, currentModOrder=null;
+  let chartProc=null, chartAvg=null, chartPie=null;
+  let chartProcW=null, chartAvgW=null, chartPieW=null;
+  let lastBusinessStart=null;
+  let lastCalendarStart=null;
+  let lastWeeklyUpdate=0;
+  let appRefreshTimerId = null;
+
+  const fired = { autoLogout:'' };
+
+  // Helpers
+  const nowMs=()=>Date.now();
+  const onlyDigits = s => String(s ?? '').replace(/\D+/g, '');
+  const clamp=(n,min,max)=>Math.min(max,Math.max(min,n));
+  function fmtHMS(sec){ sec=Math.max(0,Math.floor(sec||0)); const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60; return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
+  function fmtQty(n){ if(n==null) return ''; const r=Math.round((n+Number.EPSILON)*100)/100; return Math.abs(r-Math.round(r))<1e-9?String(Math.round(r)):r.toFixed(2); }
+  function showMsg(el, text, type='success', autohide=true){ el.textContent=text; el.className=`msg show ${type}`; if(autohide && type==='success'){ setTimeout(()=>el.classList.remove('show'),2500); } }
+  function setStatus(el, text, type='success'){ el.textContent=text; el.className=`msg show ${type}`; }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function simpleHash(str){ const salt='worklog_v1_salt'; let h=2166136261>>>0; const s=String(str)+'|'+salt; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=(h+((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24)))>>>0; } return 'v1:'+h.toString(16); }
+  function defaultProcesses(){ return [{id:1,name:'Ogólne'},{id:2,name:'Hafty'},{id:3,name:'Zgrzewy'},{id:4,name:'Szycie'},{id:5,name:'Personal packaging'},{id:6,name:'Placement'}]; }
+  function ensureProcessByName(name){ const f=state.processes.find(p=>p.name.toLowerCase()===String(name).toLowerCase()); if(f) return f.id; const id=Math.max(0,...state.processes.map(p=>+p.id||0))+1; state.processes.push({id,name:String(name)}); saveState(); return id; }
+  function ensureBaseProcesses(){ ['Hafty','Zgrzewy','Szycie','Personal packaging','Placement'].forEach(n=>ensureProcessByName(n)); }
+  function defaultStations(){
+    const N = clamp(+state.config.stationCount||30,1,30);
+    const fallbackPid = state.processes[0]?.id || 1;
+    return Array.from({length:N},(_,i)=>({id:i+1,name:`Stanowisko ${i+1}`,processId:fallbackPid,capacity:1,active:true}));
+  }
+  function stationById(id){ return state.stations.find(s=>s.id===id); }
+  function stationName(id){ const s=stationById(id); return s?s.name:`Stanowisko ${id}`; }
+  function processById(id){ return state.processes.find(p=>p.id===id); }
+  function processName(id){ const p=processById(id); return p?p.name:'—'; }
+  function pidByName(name){ const p=state.processes.find(p=>p.name.toLowerCase()===String(name).toLowerCase()); return p?.id; }
+  const isOrderOk = (s)=> /^\d{7,10}$/.test(String(s||''));
+  function canonOrder(val){
+    const d = onlyDigits(val);
+    return (d && d.length>=7 && d.length<=10) ? d : null;
+  }
+  function codeKeyFromInput(val){ const n=+onlyDigits(val); return (n>=1 && n<=999)?String(n):null; }
+  function isValidHHmm(v){ return /^([01]?\d|2[0-3]):([0-5]\d)$/.test(String(v||'')); }
+  function todayAtMs(hhmm){ if(!isValidHHmm(hhmm)) return null; const [hh,mm]=hhmm.split(':').map(x=>+x||0); const now=new Date(); return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0).getTime(); }
+  function startOfWeekMs(){ const d=new Date(); d.setHours(0,0,0,0); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.getTime(); }
+  function dayKey(ts){ const d=new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+  // Reset dobowy
+  function parseResetHHmm(){ let s=String(state.config.dailyResetHHmm||'00:00').trim(); if(!isValidHHmm(s)) s='00:00'; return s; }
+  function startOfBusinessDayMs(){ const s=parseResetHHmm(); const [hh,mm]=s.split(':').map(x=>+x||0); const now=new Date(); const d=new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0); if(now.getTime()<d.getTime()){ d.setDate(d.getDate()-1); } return d.getTime(); }
+  function startOfCalendarDayMs(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+  function endOfCalendarDayMs(){ const d=new Date(); d.setHours(23,59,59,999); return d.getTime(); }
+  function getWeekMonFriWindow(){ const monday = new Date(startOfWeekMs()); const fridayEnd = new Date(monday.getTime()); fridayEnd.setDate(fridayEnd.getDate()+4); fridayEnd.setHours(23,59,59,999); const now=nowMs(); return {t0:monday.getTime(), t1:Math.min(now, fridayEnd.getTime())}; }
+
+  // Przerwy — zamrożenie czasu
+  function buildBreakWindowsForRange(t0,t1){
+    const windows=[];
+    function addWin(hhmmStart, hhmmEnd, dayTs){
+      if(!isValidHHmm(hhmmStart) || !isValidHHmm(hhmmEnd)) return;
+      const [sh,sm]=hhmmStart.split(':').map(x=>+x||0), [eh,em]=hhmmEnd.split(':').map(x=>+x||0);
+      const d=new Date(dayTs);
+      const s=new Date(d.getFullYear(), d.getMonth(), d.getDate(), sh, sm, 0, 0).getTime();
+      const e=new Date(d.getFullYear(), d.getMonth(), d.getDate(), eh, em, 0, 0).getTime();
+      if(e>s) windows.push([s,e]);
+    }
+    const dayStart=new Date(t0); dayStart.setHours(0,0,0,0);
+    const lastDay=new Date(t1); lastDay.setHours(0,0,0,0);
+    for(let d=dayStart.getTime(); d<=lastDay.getTime(); d+=86400000){
+      addWin(state.config.break1StartHHmm, state.config.break1EndHHmm, d);
+      addWin(state.config.break2StartHHmm, state.config.break2EndHHmm, d);
+    }
+    windows.sort((a,b)=>a[0]-b[0]);
+    const merged=[];
+    for(const w of windows){
+      if(!merged.length || w[0] > merged[merged.length-1][1]) merged.push(w.slice());
+      else merged[merged.length-1][1]=Math.max(merged[merged.length-1][1], w[1]);
+    }
+    return merged;
+  }
+  function secMinusWindows(s,e,windows){
+    const S=Math.max(0, e - s); if(S<=0) return 0;
+    let overlap=0;
+    for(const [ws,we] of windows){
+      const os=Math.max(s, ws), oe=Math.min(e, we);
+      if(oe>os) overlap += (oe-os);
+    }
+    const eff=Math.max(0, S - overlap);
+    return Math.floor(eff/1000);
+  }
+
+  // Load/save
+  function loadState(){
+    try{
+      state.employees=JSON.parse(localStorage.getItem(KEYS.employees)||'{}');
+      state.stations =JSON.parse(localStorage.getItem(KEYS.stations)||'[]');
+      state.processes=JSON.parse(localStorage.getItem(KEYS.processes)||'[]');
+      state.config   =JSON.parse(localStorage.getItem(KEYS.config)||'{}');
+      state.totals   =JSON.parse(localStorage.getItem(KEYS.totals)||'{}');
+      state.active   =JSON.parse(localStorage.getItem(KEYS.active)||'{}');
+      state.logs     =JSON.parse(localStorage.getItem(KEYS.logs)||'[]');
+      state.orders   =JSON.parse(localStorage.getItem(KEYS.orders)||'[]');
+      state.importData=JSON.parse(localStorage.getItem(KEYS.import)||'{"rows":{},"fileName":"","ts":0,"count":0}');
+      state.norms    =JSON.parse(localStorage.getItem(KEYS.norms)||'{}');
+      state.orderMods=JSON.parse(localStorage.getItem(KEYS.orderMods)||'{}');
+
+      if(!Array.isArray(state.processes)||!state.processes.length) state.processes=defaultProcesses();
+      else state.processes=state.processes.map(p=>({id:+p.id,name:String(p.name||'').trim()||'—'}));
+      ensureBaseProcesses();
+
+      // Ustaw domyślną liczbę stanowisk jeśli brak w config
+      if(state.config.stationCount==null){
+        const cnt = Array.isArray(state.stations) && state.stations.length ? state.stations.length : 30;
+        state.config.stationCount = clamp(+cnt||30,1,30);
+      }
+
+      if(!Array.isArray(state.stations)||!state.stations.length) state.stations=defaultStations();
+      else {
+        const fallback=state.processes[0]?.id||1;
+        state.stations=state.stations.map(s=>({id:+s.id,name:String(s.name||`Stanowisko ${s.id}`),capacity:Math.max(1,+s.capacity||1),active:!!s.active,processId:Number.isFinite(+s.processId)?+s.processId:fallback}));
+      }
+
+      for(const k in state.totals) state.totals[k]=+state.totals[k]||0;
+      for(const k in state.active){
+        state.active[k].stationId=+state.active[k].stationId;
+        state.active[k].start=+state.active[k].start;
+        state.active[k].processId=Number.isFinite(+state.active[k].processId)?+state.active[k].processId:(stationById(+state.active[k].stationId)?.processId||1);
+      }
+      state.logs=(Array.isArray(state.logs)?state.logs:[]).map(r=>({code:String(r.code),stationId:+r.stationId,processId:Number.isFinite(+r.processId)?+r.processId:(stationById(+r.stationId)?.processId||1),start:+r.start,end:+r.end,durationSec:+r.durationSec}));
+
+      if(!state.importData || typeof state.importData!=='object') state.importData={rows:{}, fileName:'', ts:0, count:0};
+      else { state.importData.rows=state.importData.rows||{}; state.importData.count=+state.importData.count||0; }
+
+      for(const pid in state.norms) state.norms[pid]=+state.norms[pid]||0;
+      for(const ord in state.orderMods){
+        const o=state.orderMods[ord]; if(!o||typeof o!=='object'){ delete state.orderMods[ord]; continue; }
+        for(const pid in o){ const v=+o[pid]; state.orderMods[ord][pid]=Number.isFinite(v)?clamp(Math.round(v/10)*10,-50,50):0; }
+      }
+
+      // config defaults
+      if(!state.config || !state.config.adminPinHash) state.config.adminPinHash=simpleHash('0000');
+      if(!state.config.dailyResetHHmm) state.config.dailyResetHHmm='00:00';
+      if(state.config.minSegSec==null) state.config.minSegSec=60;
+      if(!state.config.allocMode) state.config.allocMode='proportional';
+      if(state.config.autoLogoutHHmm==null) state.config.autoLogoutHHmm='';
+      if(state.config.break1StartHHmm==null) state.config.break1StartHHmm='';
+      if(state.config.break1EndHHmm==null) state.config.break1EndHHmm='';
+      if(state.config.break2StartHHmm==null) state.config.break2StartHHmm='';
+      if(state.config.break2EndHHmm==null) state.config.break2EndHHmm='';
+      if(state.config.refreshIntervalMin==null) state.config.refreshIntervalMin=1;
+      if(!state.config.orderValidationMode) state.config.orderValidationMode='warn';
+    }catch(e){ console.warn('Błąd odczytu danych', e); clearAllData(true); }
+  }
+  function saveState(){
+    localStorage.setItem(KEYS.totals,JSON.stringify(state.totals));
+    localStorage.setItem(KEYS.active,JSON.stringify(state.active));
+    localStorage.setItem(KEYS.logs,JSON.stringify(state.logs));
+    localStorage.setItem(KEYS.employees,JSON.stringify(state.employees));
+    localStorage.setItem(KEYS.stations,JSON.stringify(state.stations));
+    localStorage.setItem(KEYS.processes,JSON.stringify(state.processes));
+    localStorage.setItem(KEYS.orders,JSON.stringify(state.orders));
+    localStorage.setItem(KEYS.import,JSON.stringify(state.importData));
+    localStorage.setItem(KEYS.norms,JSON.stringify(state.norms));
+    localStorage.setItem(KEYS.orderMods,JSON.stringify(state.orderMods));
+    localStorage.setItem(KEYS.config,JSON.stringify(state.config));
+  }
+
+  function clearAllData(silent=false){
+    state.totals={}; state.active={}; state.logs=[]; state.orders=[];
+    saveState(); updateAll();
+    if(!silent) showMsg(els.msg,'Wyczyszczono dane (sesje, sumy, historia, zlecenia).');
+  }
+  function clearImportData(){
+    state.importData={rows:{}, fileName:'', ts:0, count:0};
+    saveState(); updateImportUI(); updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+    setStatus(els.importStatus,'Import wyczyszczony. Brak danych importu.','error');
+  }
+
+  // UI podstawowe
+  function updateStationSelect(){
+    const prev=+els.station.value||null; els.station.innerHTML='';
+    const occ=new Map(); for(const code in state.active){ const sid=state.active[code].stationId; occ.set(sid,(occ.get(sid)||0)+1); }
+    state.stations.filter(s=>s.active).sort((a,b)=>a.id-b.id).forEach(s=>{
+      const used=occ.get(s.id)||0, full=used>=(s.capacity||1);
+      const opt=document.createElement('option');
+      opt.value=s.id; const label=`${s.name} • ${processName(s.processId)}`;
+      opt.textContent=used>0?`${label} (${used}/${s.capacity})${full?' — pełne':''}`:label;
+      if(full) opt.disabled=true;
+      els.station.appendChild(opt);
+    });
+    if(prev && state.stations.find(s=>s.id===prev && s.active)) els.station.value=String(prev);
+  }
+
+  function showAdminUI(show){
+    isAdmin=!!show; els.adminPanel.style.display=isAdmin?'block':'none';
+    els.btnAdminLogout.style.display=isAdmin?'inline-block':'none';
+    els.btnOpenAdmin.style.display=isAdmin?'none':'inline-block';
+    els.adminBadge.style.display=isAdmin?'inline-block':'none';
+    if(isAdmin) updateAdminAll();
+  }
+
+  // Logowanie/wylogowanie
+  function doLogin(){
+    const code=codeKeyFromInput(els.code.value); if(!code){ showMsg(els.msg,'Podaj poprawny kod 1–999.','error'); return; }
+    const emp=state.employees[code]; if(!emp){ showMsg(els.msg,`Kod ${code} nie jest na liście pracowników.`,'error'); return; }
+    if(!emp.active){ showMsg(els.msg,`Pracownik ${code} (${emp.name||'bez nazwy'}) jest nieaktywny.`,'error'); return; }
+    const stationId=+els.station.value; if(!stationId){ showMsg(els.msg,'Wybierz stanowisko.','error'); return; }
+    const st=state.stations.find(s=>s.id===stationId && s.active); if(!st){ showMsg(els.msg,'Wybrane stanowisko nieaktywne.','error'); return; }
+    if(state.active[code]){ showMsg(els.msg,`Kod ${code} już zalogowany na: ${stationName(state.active[code].stationId)}.`,'error'); return; }
+    const used=Object.values(state.active).filter(x=>x.stationId===stationId).length, cap=Math.max(1, +st.capacity||1);
+    if(used>=cap){ showMsg(els.msg,`Stanowisko "${st.name}" jest pełne (${used}/${cap}).`,'error'); return; }
+    state.active[code]={stationId,processId:st.processId,start:nowMs()}; saveState(); updateAll();
+    els.code.value=''; els.code.focus();
+    showMsg(els.msg,`Zalogowano ${code} (${emp.name||'bez nazwy'}) na "${st.name}" • ${processName(st.processId)}.`);
+  }
+  function doLogout(codeFromRow=null){
+    const code=codeFromRow||codeKeyFromInput(els.code.value); if(!code){ showMsg(els.msg,'Podaj poprawny kod 1–999.','error'); return; }
+    const ses=state.active[code]; if(!ses){ showMsg(els.msg,`Kod ${code} nie jest obecnie zalogowany.`,'error'); return; }
+    const end=nowMs(), durSec=Math.max(1, Math.round((end-ses.start)/1000));
+    state.totals[code]=(state.totals[code]||0)+durSec; state.logs.push({code,stationId:ses.stationId,processId:ses.processId,start:ses.start,end,durationSec:durSec});
+    delete state.active[code]; saveState(); updateAll();
+    els.code.value=''; els.code.focus();
+    showMsg(els.msg,`Wylogowano ${code}.`);
+  }
+
+  function logoutAllNow(){
+    const now=nowMs();
+    const codes=Object.keys(state.active);
+    if(!codes.length) return;
+    codes.forEach(code=>{
+      const ses=state.active[code]; if(!ses) return;
+      const durSec=Math.max(1, Math.round((now - ses.start)/1000));
+      state.totals[code]=(state.totals[code]||0)+durSec;
+      state.logs.push({code,stationId:ses.stationId,processId:ses.processId,start:ses.start,end:now,durationSec:durSec});
+      delete state.active[code];
+    });
+    saveState(); updateAll();
+  }
+
+  // Rejestracja zlecenia (7–10 cyfr + walidacja względem importu z trybem ostrzegaj/blokuj)
+  function addOrder(){
+    const code=codeKeyFromInput(els.ordEmpCode.value); if(!code){ showMsg(els.orderMsg,'Podaj kod 1–999.','error',false); return; }
+    const emp=state.employees[code]; if(!emp || !emp.active){ showMsg(els.orderMsg,'Nieprawidłowy lub nieaktywny pracownik.','error',false); return; }
+    const ses=state.active[code]; if(!ses){ showMsg(els.orderMsg,'Pracownik musi być zalogowany.','error',false); return; }
+    const ord=canonOrder(els.ordNumber.value); if(!ord){ showMsg(els.orderMsg,'Numer zlecenia musi mieć 7–10 cyfr.','error',false); return; }
+    const pid=+ses.processId || (stationById(ses.stationId)?.processId) || 1;
+
+    const importRow = (state.importData.rows||{})[ord];
+    const baseQty = importRow ? +importRow[pid]||0 : 0;
+
+    const mode = state.config.orderValidationMode || 'warn';
+    if(!importRow || baseQty<=0){
+      if(mode==='block'){
+        const msg = !importRow
+          ? 'Błąd: brak tego zlecenia w imporcie (tryb blokady).'
+          : `Błąd: w imporcie ilość dla procesu ${processName(pid)} = 0 (tryb blokady).`;
+        showMsg(els.orderMsg, msg, 'error', false);
+        return;
+      }
+    }
+
+    let msgType='success', extra='';
+    if(!importRow){
+      msgType='warn'; extra=' Ostrzeżenie: brak tego zlecenia w imporcie.';
+    } else if(baseQty<=0){
+      msgType='warn'; extra=` Ostrzeżenie: w imporcie ilość dla procesu ${processName(pid)} = 0.`;
+    }
+
+    state.orders.push({code,processId:pid,order:ord,ts:nowMs()}); saveState(); updateAll();
+    showMsg(els.orderMsg,`Dodano zlecenie ${ord} do ${processName(pid)}.${extra}`, msgType, msgType==='success');
+    els.ordEmpCode.value=''; els.ordNumber.value=''; els.ordEmpCode.focus();
+  }
+  function clearActiveOrder(){
+    const code=codeKeyFromInput(els.ordEmpCode.value); if(!code){ showMsg(els.orderMsg,'Podaj kod 1–999 (pole wyżej).','error',false); return; }
+    const emp=state.employees[code]; if(!emp || !emp.active){ showMsg(els.orderMsg,'Nieprawidłowy lub nieaktywny pracownik.','error',false); return; }
+    const ses=state.active[code]; if(!ses){ showMsg(els.orderMsg,'Pracownik musi być zalogowany, aby wyczyścić zlecenie.','error',false); return; }
+    const pid=+ses.processId || 1;
+    state.orders.push({code,processId:pid,order:'',ts:nowMs()});
+    saveState(); updateAll();
+    showMsg(els.orderMsg,`Wyczyszczono aktywne zlecenie dla ${emp.name||code} (${processName(pid)}).`, 'success', true);
+    els.ordNumber.value='';
+  }
+
+  // Public tables + helper
+  function latestOrderFor(code, pid, since){
+    for(let i=state.orders.length-1;i>=0;i--){
+      const o=state.orders[i];
+      if(o.code===code && o.processId===pid && o.ts>=since && isOrderOk(onlyDigits(o.order))) return o;
+    }
+    return null;
+  }
+  function updateCurrentOrders(){
+    const tbody=els.tblCurrentOrders; tbody.innerHTML='';
+    const rows=[];
+    for(const code in state.active){
+      const ses=state.active[code];
+      const o=latestOrderFor(code,ses.processId,ses.start);
+      if(o){ rows.push({code,name:state.employees[code]?.name||'',processId:ses.processId,order:o.order,ts:o.ts}); }
+    }
+    rows.sort((a,b)=>b.ts-a.ts);
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${escapeHtml(r.name)}</td><td>${escapeHtml(processName(r.processId))}</td><td>${escapeHtml(r.order)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function updateActivePublic(){
+    const tbody=els.tblActivePublic; tbody.innerHTML='';
+    Object.entries(state.active).sort((a,b)=>+a[0]-+b[0]).forEach(([code,ses])=>{
+      const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHtml(state.employees[code]?.name||'—')}</td><td>${escapeHtml(stationName(ses.stationId))}</td>`; tbody.appendChild(tr);
+    });
+  }
+
+  // Admin tables
+  function updateAdminEmployees(){
+    const tbody=els.tblEmployees; tbody.innerHTML='';
+    Object.keys(state.employees).map(k=>+k).filter(Number.isFinite).sort((a,b)=>a-b).forEach(n=>{
+      const code=String(n), r=state.employees[code]; const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${code}</td><td><input type="text" value="${escapeHtml(r.name||'')}" data-emp-name="${code}" /></td><td style="text-align:center"><input type="checkbox" ${r.active?'checked':''} data-emp-active="${code}" /></td><td><button class="small danger" data-action="del-emp" data-code="${code}">Usuń</button></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function canDeleteEmployee(code){ return !state.active[code]; }
+  function usageCountForProcess(pid){ return state.stations.reduce((n,s)=>n+(s.processId===pid?1:0),0); }
+  function updateAdminProcesses(){
+    const tbody=els.tblProcesses; tbody.innerHTML='';
+    state.processes.slice().sort((a,b)=>a.id-b.id).forEach(p=>{
+      const used=usageCountForProcess(p.id);
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${p.id}</td><td><input type="text" value="${escapeHtml(p.name)}" data-proc-name="${p.id}" /></td><td>${used} stanow.</td><td><button class="small danger" data-action="del-proc" data-proc="${p.id}" ${used>0?'disabled':''}>Usuń</button></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function updateAdminStations(){
+    const tbody=els.tblStations; tbody.innerHTML='';
+    const occ=new Map(); for(const code in state.active){ const sid=state.active[code].stationId; occ.set(sid,(occ.get(sid)||0)+1); }
+    const procs=state.processes.slice().sort((a,b)=>a.id-b.id);
+    state.stations.slice().sort((a,b)=>a.id-b.id).forEach(s=>{
+      const used=occ.get(s.id)||0; const opts=procs.map(p=>`<option value="${p.id}" ${s.processId===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${s.id}</td><td><input type="text" value="${escapeHtml(s.name)}" data-st-name="${s.id}"></td><td><select data-st-process="${s.id}">${opts}</select></td><td style="max-width:140px"><input type="number" min="1" step="1" value="${+s.capacity||1}" data-st-capacity="${s.id}"> <span class="muted">(${used} zajęte)</span></td><td style="text-align:center"><input type="checkbox" ${s.active?'checked':''} data-st-active="${s.id}"></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function updateAdminActive(){
+    const tbody=els.tblActiveAdmin; tbody.innerHTML='';
+    Object.entries(state.active).sort((a,b)=>+a[0]-+b[0]).forEach(([code,ses])=>{
+      const activeOrd = latestOrderFor(code, ses.processId, ses.start)?.order || '—';
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${code}</td><td>${escapeHtml(state.employees[code]?.name||'')}</td><td>${escapeHtml(stationName(ses.stationId))}</td><td>${escapeHtml(processName(ses.processId))}</td><td>${escapeHtml(activeOrd)}</td><td>${new Date(ses.start).toLocaleString('pl-PL')}</td><td class="elapsed" data-code="${code}" data-start="${ses.start}">${fmtHMS(Math.floor((nowMs()-ses.start)/1000))}</td><td><button class="small ghost" data-action="force-logout" data-code="${code}">Wyloguj</button></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function updateAdminLogs(){
+    const tbody=els.tblLogsAdmin; tbody.innerHTML='';
+    const dayStart = startOfCalendarDayMs();
+    const dayEnd = endOfCalendarDayMs();
+    const rows = state.logs
+      .filter(r => (Math.min(r.end,dayEnd) - Math.max(r.start,dayStart)) > 0)
+      .sort((a,b)=> b.start - a.start);
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${r.code}</td><td>${escapeHtml(state.employees[r.code]?.name||'')}</td><td>${escapeHtml(stationName(r.stationId))}</td><td>${escapeHtml(processName(r.processId))}</td><td>${new Date(r.start).toLocaleString('pl-PL')}</td><td>${new Date(r.end).toLocaleString('pl-PL')}</td><td>${fmtHMS(r.durationSec)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Import (P/T/U/V/W/X/Y)
+  async function doImportFile(){
+    const file=els.importFile.files && els.importFile.files[0]; if(!file){ setStatus(els.importStatus,'Wybierz plik do importu.','error'); return; }
+    if(typeof XLSX==='undefined'){ setStatus(els.importStatus,'Brak biblioteki XLSX (Internet).','error'); return; }
+    const col=letters=>{ let n=0; for(const ch of String(letters).toUpperCase()){ const k=ch.charCodeAt(0)-64; if(k<1||k>26) continue; n=n*26+k; } return n-1; };
+    const toNum=v=>Number(v||0)||0;
+    try{
+      const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}), ws=wb.Sheets[wb.SheetNames[0]], rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true});
+      if(!rows || !rows.length){ setStatus(els.importStatus,'Brak danych w arkuszu.','error'); return; }
+      const pidHafty=ensureProcessByName('Hafty'), pidZgrzewy=ensureProcessByName('Zgrzewy'), pidSzycie=ensureProcessByName('Szycie'), pidPack=ensureProcessByName('Personal packaging'), pidPlacement=ensureProcessByName('Placement');
+      const IDX={P:col('P'),T:col('T'),U:col('U'),V:col('V'),W:col('W'),X:col('X'),Y:col('Y')};
+      const map={}; let imported=0;
+      for(const r of rows){
+        if(!r) continue;
+        const ord=canonOrder(r[IDX.P]); if(!ord) continue;
+        const qHafty=toNum(r[IDX.T]); const qZgrz=toNum(r[IDX.W]); const qSzy=toNum(r[IDX.U])+toNum(r[IDX.V])+toNum(r[IDX.X]); const qPack=toNum(r[IDX.Y]); const qPlacement=qZgrz;
+        if(!map[ord]) map[ord]={};
+        map[ord][pidHafty]=(map[ord][pidHafty]||0)+qHafty;
+        map[ord][pidSzycie]=(map[ord][pidSzycie]||0)+qSzy;
+        map[ord][pidZgrzewy]=(map[ord][pidZgrzewy]||0)+qZgrz;
+        map[ord][pidPack]=(map[ord][pidPack]||0)+qPack;
+        map[ord][pidPlacement]=(map[ord][pidPlacement]||0)+qPlacement;
+        imported++;
+      }
+      state.importData={rows:map,fileName:file.name,ts:nowMs(),count:imported}; saveState(); updateImportUI(); updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+      setStatus(els.importStatus,`Zaimportowano ${imported} wierszy z pliku: ${file.name}`,'success');
+    }catch(e){ console.error(e); setStatus(els.importStatus,'Błąd importu. Sprawdź układ kolumn (P/T/U/V/W/X/Y).','error'); }
+  }
+  function updateImportUI(){
+    if(state.importData && state.importData.count) setStatus(els.importStatus,`Wczytano: ${state.importData.count} wierszy z pliku: ${state.importData.fileName}`,'success');
+    else setStatus(els.importStatus,'Brak danych importu.','error');
+    updateNormsTable();
+  }
+  function updateNormsTable(){
+    const tbody=els.tblNorms; if(!tbody) return; tbody.innerHTML='';
+    const wanted=['Hafty','Zgrzewy','Szycie','Placement','Personal packaging'];
+    const procs=state.processes.filter(p=>wanted.some(w=>w.toLowerCase()===p.name.toLowerCase()))
+      .sort((a,b)=>wanted.findIndex(w=>w.toLowerCase()===a.name.toLowerCase())-wanted.findIndex(w=>w.toLowerCase()===b.name.toLowerCase()));
+    procs.forEach(p=>{ const val=+state.norms[p.id]||0; const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHtml(p.name)}</td><td><input type="number" min="0" step="0.01" value="${val}" data-norm-pid="${p.id}" style="width:140px"></td>`; tbody.appendChild(tr); });
+  }
+  $('#tblNorms').addEventListener('input', e=>{
+    const inp=e.target; if(!inp.hasAttribute('data-norm-pid')) return;
+    const pid=inp.getAttribute('data-norm-pid'); const v=+inp.value;
+    state.norms[pid]=(Number.isFinite(v)&&v>=0)?v:0; saveState(); updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+  });
+
+  // Wyniki — czas w oknie (z zamrożeniem przerw)
+  function computeTimeByEmpProcessInRange(t0, t1){
+    const windows=buildBreakWindowsForRange(t0,t1);
+    const m=new Map(), key=(c,p)=>`${c}|${p}`, add=(c,p,s)=>{ if(s<=0) return; const k=key(c,p); m.set(k,(m.get(k)||0)+s); };
+    state.logs.forEach(r=>{
+      const s=Math.max(r.start,t0), e=Math.min(r.end,t1);
+      const sec=secMinusWindows(s,e,windows);
+      add(r.code, r.processId, sec);
+    });
+    const now=nowMs();
+    for(const code in state.active){
+      const ses=state.active[code];
+      const s=Math.max(ses.start,t0), e=Math.min(now,t1);
+      const sec=secMinusWindows(s,e,windows);
+      add(code, ses.processId, sec);
+    }
+    return m;
+  }
+
+  // Podział po czasie: bez dziedziczenia zlecenia sprzed startu sesji
+  function computeOrderTimeSharesInRange(t0,t1){
+    const now=nowMs();
+    const windows=buildBreakWindowsForRange(t0,t1);
+    const sessions = new Map();
+    const pushInt=(k,s,e)=>{ if(e>s){ const arr=sessions.get(k)||[]; arr.push([s,e]); sessions.set(k,arr);} };
+
+    state.logs.forEach(r=>{ const s=Math.max(r.start,t0), e=Math.min(r.end,t1); if(e>s) pushInt(`${r.code}|${r.processId}`, s, e); });
+    for(const code in state.active){
+      const ses=state.active[code]; const s=Math.max(ses.start,t0), e=Math.min(now,t1); if(e>s) pushInt(`${code}|${ses.processId}`, s, e);
+    }
+
+    const evIdx=new Map();
+    state.orders.forEach(o=>{
+      if(o.ts>t1) return;
+      const k=`${o.code}|${o.processId}`; const arr=evIdx.get(k)||[]; arr.push({ts:o.ts, ord:o.order}); evIdx.set(k,arr);
+    });
+    for(const arr of evIdx.values()) arr.sort((a,b)=>a.ts-b.ts);
+
+    function firstIndexAtOrAfter(arr,t){
+      let lo=0,hi=arr.length-1,res=arr.length;
+      while(lo<=hi){ const mid=(lo+hi)>>1; if(arr[mid].ts>=t){ res=mid; hi=mid-1; } else lo=mid+1; }
+      return res;
+    }
+
+    const shares=new Map();
+    const addShare=(k,ord,sec)=>{
+      if(!ord || !isOrderOk(onlyDigits(ord))) return;
+      if(sec<=(+state.config.minSegSec||0)) return;
+      const kk=`${k}|${ord}`;
+      shares.set(kk,(shares.get(kk)||0)+sec);
+    };
+
+    for(const [k, ranges] of sessions){
+      const events = evIdx.get(k) || [];
+      for(const [sStart,sEnd] of ranges){
+        let i = firstIndexAtOrAfter(events, sStart);
+        let curOrd = null;
+        let cursor = sStart;
+
+        while(i<events.length && events[i].ts<=sEnd){
+          const t=events[i].ts;
+          const sec=secMinusWindows(cursor, Math.min(t,sEnd), windows);
+          if(curOrd && sec>0) addShare(k, curOrd, sec);
+          curOrd=events[i].ord;
+          cursor=t;
+          i++;
+        }
+        if(cursor<sEnd && curOrd){
+          const sec=secMinusWindows(cursor, sEnd, windows);
+          if(sec>0) addShare(k, curOrd, sec);
+        }
+      }
+    }
+    return shares;
+  }
+
+  const keyCP=(code,pid)=>`${code}|${pid}`;
+  function computeQtyAllocByEmpInRange(t0,t1, adjusted=true){
+    const shares=computeOrderTimeSharesInRange(t0,t1);
+    const totalByOrdPid=new Map();
+    const qtyCache=new Map();
+
+    for(const [k,sec] of shares){
+      const [code,pidStr,ord]=k.split('|'); const pid=+pidStr;
+      const kp=`${pid}|${ord}`;
+      if(!qtyCache.has(kp)){
+        const qty = adjusted ? getAdjustedQty(ord,pid) : getBaseQty(ord,pid);
+        qtyCache.set(kp, qty);
+      }
+      const qtyTot=qtyCache.get(kp)||0;
+      if(qtyTot>0) totalByOrdPid.set(kp,(totalByOrdPid.get(kp)||0)+sec);
+    }
+
+    const agg=new Map();
+    for(const [k,sec] of shares){
+      const [code,pidStr,ord]=k.split('|'); const pid=+pidStr;
+      const kp=`${pid}|${ord}`;
+      const totalSec=totalByOrdPid.get(kp)||0; const qtyTotal=qtyCache.get(kp)||0;
+      if(totalSec<=0 || qtyTotal<=0) continue;
+      const alloc=qtyTotal*(sec/totalSec);
+      const cpk=`${code}|${pid}`;
+      let rec=agg.get(cpk);
+      if(!rec){ rec={code,pid,qtySum:0,orders:new Set()}; agg.set(cpk,rec); }
+      rec.qtySum+=alloc; rec.orders.add(ord);
+    }
+    return agg;
+  }
+
+  function getAdjustedQty(ord,pid){ const base=+((state.importData.rows||{})[ord]?.[pid]||0), pct=+((state.orderMods||{})[ord]?.[pid]||0); return base*(1+pct/100); }
+  function getBaseQty(ord,pid){ return +((state.importData.rows||{})[ord]?.[pid]||0); }
+
+  function computeImportAggInRange_Full(t0, t1, adjusted=true){
+    const map=state.importData.rows||{};
+    const seen=new Set();
+    const agg=new Map();
+    for(const o of state.orders){
+      if(o.ts==null || o.ts<t0 || o.ts>t1) continue;
+      const ord=o.order, pid=o.processId, code=o.code;
+      if(!isOrderOk(onlyDigits(ord))) continue;
+      if(!map[ord]) continue;
+      const dd=`${code}|${pid}|${ord}`;
+      if(seen.has(dd)) continue; seen.add(dd);
+      const qty = adjusted ? getAdjustedQty(ord,pid) : getBaseQty(ord,pid);
+      if(qty>0){
+        const key=`${code}|${pid}`;
+        let rec=agg.get(key);
+        if(!rec){ rec={code,pid,qtySum:0,orders:new Set()}; agg.set(key,rec); }
+        rec.qtySum += qty;
+        rec.orders.add(ord);
+      }
+    }
+    return agg;
+  }
+
+  function computeImportAggInRange(t0, t1, adjusted=true){
+    if(state.config.allocMode==='full') return computeImportAggInRange_Full(t0,t1,adjusted);
+    return computeQtyAllocByEmpInRange(t0,t1,adjusted);
+  }
+
+  function computeResultsCombinedInRange(t0,t1){
+    const timeMap=computeTimeByEmpProcessInRange(t0,t1), aggMap=computeImportAggInRange(t0,t1,true), out=[];
+    const keys=new Set([...aggMap.keys(),...timeMap.keys()]);
+    for(const k of keys){
+      const [code,pidStr]=k.split('|'); const pid=+pidStr;
+      const rec=aggMap.get(k); const qtySum=rec?.qtySum||0; const orders=rec?.orders||new Set(); if(qtySum<=0) continue;
+      const timeSec=timeMap.get(k)||0; const timeH=timeSec/3600; const realSztH=timeH>0?(qtySum/timeH):null; const norm=+state.norms[pid]||0; const percent=(realSztH!=null && norm>0)?(realSztH/norm)*100:null;
+      out.push({code,pid,qtySum,orders,timeSec,percent});
+    }
+    out.sort((a,b)=>+a.code-+b.code || processName(a.pid).localeCompare(processName(b.pid)));
+    return out;
+  }
+
+  function updateResultsUI(){
+    const tbody=els.tblResults; if(!tbody) return; tbody.innerHTML='';
+    const t0=startOfBusinessDayMs(), t1=nowMs();
+    computeResultsCombinedInRange(t0,t1).forEach(r=>{
+      const tr=document.createElement('tr');
+      const emp=state.employees[r.code]?.name||'', orders=Array.from(r.orders).sort().join(' '), pct=r.percent!=null?(Math.round(r.percent*10)/10).toFixed(1)+'%':'';
+      tr.innerHTML=`<td>${r.code}</td><td>${escapeHtml(emp)}</td><td>${escapeHtml(processName(r.pid))}</td><td>${fmtQty(r.qtySum)}</td><td>${fmtHMS(r.timeSec)}</td><td>${pct}</td><td>${r.orders.size}</td><td style="max-width:480px; white-space:normal">${escapeHtml(orders)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Wyniki tygodniowe (Pn–Pt)
+  function computeWeeklyByEmployee(){
+    const {t0,t1} = getWeekMonFriWindow();
+    const timeMap=computeTimeByEmpProcessInRange(t0,t1);
+    const qtyMap =computeImportAggInRange(t0,t1,true);
+
+    const codes=new Set([
+      ...Array.from(timeMap.keys()).map(k=>k.split('|')[0]),
+      ...Array.from(qtyMap .keys()).map(k=>k.split('|')[0])
+    ]);
+
+    const out=[];
+    codes.forEach(code=>{
+      let timeSec=0, qtySum=0, expected=0;
+      state.processes.forEach(p=>{
+        const pid=p.id, k=`${code}|${pid}`;
+        const t=timeMap.get(k)||0;
+        const q=qtyMap.get(k)?.qtySum||0;
+        timeSec += t;
+        qtySum  += q;
+        const norm=+state.norms[pid]||0;
+        expected += (t/3600)*norm;
+      });
+      const percent=(expected>0 && qtySum>0) ? (qtySum/expected)*100 : null;
+      out.push({code, name:state.employees[code]?.name||'', timeSec, qtySum, percent});
+    });
+    out.sort((a,b)=>+a.code-+b.code);
+    return out;
+  }
+  function updateWeeklyResultsUI(){
+    const tbody=els.tblWeeklyResults; if(!tbody) return;
+    tbody.innerHTML='';
+    computeWeeklyByEmployee().forEach(r=>{
+      const pct = r.percent!=null ? (Math.round(r.percent*10)/10).toFixed(1)+'%' : '';
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${r.code}</td><td>${escapeHtml(r.name)}</td><td>${fmtQty(r.qtySum)}</td><td>${fmtHMS(r.timeSec)}</td><td>${pct}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function exportCSV_WeeklyResults(){
+    const rows=computeWeeklyByEmployee();
+    if(!rows.length){ alert('Brak danych tygodniowych do eksportu.'); return; }
+    const sep=';';
+    const header=['kod','pracownik','czas_s','czas_hms','ilosc_suma','wynik_proc'].join(sep);
+    const lines=rows.map(r=>[
+      r.code, (state.employees[r.code]?.name||''), r.timeSec, fmtHMS(r.timeSec), fmtQty(r.qtySum),
+      r.percent!=null ? (Math.round(r.percent*10)/10) : ''
+    ].join(sep));
+    downloadCSV([header,...lines].join('\n'), 'wyniki_tygodniowe');
+  }
+
+  // Charts — plugin % na doughnut
+  const percentDoughnutLabels = {
+    id: 'percentDoughnutLabels',
+    afterDatasetsDraw(chart){
+      if(chart.config.type!=='doughnut') return;
+      const ds=chart.data.datasets[0]; if(!ds) return;
+      const meta=chart.getDatasetMeta(0), ctx=chart.ctx;
+      const total = ds.data.reduce((a,b)=>a+(+b||0),0);
+      meta.data.forEach((arc,i)=>{
+        const val=+ds.data[i]||0; if(total<=0 || val<=0) return;
+        const pct=Math.round((val/total)*1000)/10;
+        const p=arc.getProps(['x','y','startAngle','endAngle','innerRadius','outerRadius'],true);
+        const angle=(p.startAngle+p.endAngle)/2, r=(p.innerRadius+p.outerRadius)/2;
+        const x=p.x+Math.cos(angle)*r, y=p.y+Math.sin(angle)*r;
+        ctx.save(); ctx.fillStyle='#111827';
+        ctx.font='bold 12px Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(pct+'%', x, y); ctx.restore();
+      });
+    }
+  };
+  if (typeof Chart !== 'undefined') { Chart.register(percentDoughnutLabels); }
+
+  // Init charty — dzienne
+  function initChartProc(){ if(chartProc) return;
+    chartProc = new Chart(els.chProc.getContext('2d'), {
+      type:'bar',
+      data:{ labels:['Hafty','Zgrzewy','Szycie'], datasets:[{ label:'Ilość (bez korekt)', data:[0,0,0], backgroundColor:['#60a5fa','#34d399','#f59e0b'] }] },
+      options:{ responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{ label:ctx=>` ${fmtQty(ctx.raw)} szt`}}}, scales:{ y:{ beginAtZero:true } } }
+    });
+  }
+  function initChartAvg(){ if(chartAvg) return;
+    chartAvg = new Chart(els.chAvgNorm.getContext('2d'), {
+      type:'bar',
+      data:{ labels:['Hafty','Zgrzewy','Szycie','Placement','Personal packaging'], datasets:[{ label:'Śr. norma (%)', data:[0,0,0,0,0], backgroundColor:'#a78bfa' }] },
+      options:{ responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{ label:ctx=>` ${fmtQty(ctx.raw)} %`}}}, scales:{ y:{ beginAtZero:true, ticks:{ callback:(v)=>v+'%' } } } }
+    });
+  }
+  function initChartPie(){ if(chartPie) return;
+    chartPie = new Chart(els.chProd.getContext('2d'), {
+      type:'doughnut',
+      data:{ labels:['Produktywni','Nieproduktywni'], datasets:[{ data:[0,0], backgroundColor:['#10b981','#ef4444'] }] },
+      options:{ responsive:true, plugins:{ legend:{position:'bottom'}, tooltip:{callbacks:{ label:(ctx)=>` ${ctx.label}: ${Number(ctx.raw).toFixed(1)}%`}} } }
+    });
+  }
+
+  // Init charty — tygodniowe (Pn–Pt)
+  function initChartProcW(){ if(chartProcW) return;
+    chartProcW = new Chart(els.chProcWeek.getContext('2d'), {
+      type:'bar',
+      data:{ labels:['Hafty','Zgrzewy','Szycie'], datasets:[{ label:'Ilość (bez korekt)', data:[0,0,0], backgroundColor:['#60a5fa','#34d399','#f59e0b'] }] },
+      options:{ responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{ label:ctx=>` ${fmtQty(ctx.raw)} szt`}}}, scales:{ y:{ beginAtZero:true } } }
+    });
+  }
+  function initChartAvgW(){ if(chartAvgW) return;
+    chartAvgW = new Chart(els.chAvgNormWeek.getContext('2d'), {
+      type:'bar',
+      data:{ labels:['Hafty','Zgrzewy','Szycie','Placement','Personal packaging'], datasets:[{ label:'Śr. norma (%)', data:[0,0,0,0,0], backgroundColor:'#a78bfa' }] },
+      options:{ responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{ label:ctx=>` ${fmtQty(ctx.raw)} %`}}}, scales:{ y:{ beginAtZero:true, ticks:{ callback:(v)=>v+'%' } } } }
+    });
+  }
+  function initChartPieW(){ if(chartPieW) return;
+    chartPieW = new Chart(els.chProdWeek.getContext('2d'), {
+      type:'doughnut',
+      data:{ labels:['Produktywni','Nieproduktywni'], datasets:[{ data:[0,0], backgroundColor:['#10b981','#ef4444'] }] },
+      options:{ responsive:true, plugins:{ legend:{position:'bottom'}, tooltip:{callbacks:{ label:(ctx)=>` ${ctx.label}: ${Number(ctx.raw).toFixed(1)}%`}} } }
+    });
+  }
+
+  // Obliczenia dla wykresów
+  function computeProcessTotalsRawForCharts(t0,t1){
+    const totals=new Map(), seen=new Set();
+    for(const o of state.orders){
+      if(o.ts==null || o.ts<t0 || o.ts>t1) continue;
+      if(!isOrderOk(onlyDigits(o.order))) continue;
+      const key=`${o.processId}|${o.order}`; if(seen.has(key)) continue; seen.add(key);
+      const qty=getBaseQty(o.order,o.processId); if(qty>0) totals.set(o.processId,(totals.get(o.processId)||0)+qty);
+    }
+    return totals;
+  }
+  function computeAvgPercentPerProcessInRange(t0,t1){
+    const results=computeResultsCombinedInRange(t0,t1);
+    const wanted=['Hafty','Zgrzewy','Szycie','Placement','Personal packaging'];
+    const pidWanted=wanted.map(pidByName).filter(Boolean);
+    const sums=new Map(), counts=new Map();
+    results.forEach(r=>{
+      if(!pidWanted.includes(r.pid)) return;
+      if(r.percent==null) return;
+      sums.set(r.pid,(sums.get(r.pid)||0)+r.percent);
+      counts.set(r.pid,(counts.get(r.pid)||0)+1);
+    });
+    const avgs=new Map();
+    pidWanted.forEach(pid=>{
+      const avg=(counts.get(pid)||0)>0 ? (sums.get(pid)/counts.get(pid)) : 0;
+      avgs.set(pid, avg);
+    });
+    return avgs;
+  }
+  function computeProductivityDurations(t0,t1){
+    const windows=buildBreakWindowsForRange(t0,t1);
+    const prodNames=['hafty','zgrzewy','szycie','placement','personal packaging'];
+    let prod=0, non=0;
+    const add=(pid, s, e)=>{
+      const sec=secMinusWindows(s,e,windows); if(sec<=0) return;
+      const name=(processName(pid)||'').toLowerCase();
+      if(prodNames.includes(name)) prod+=sec; else non+=sec;
+    };
+    state.logs.forEach(r=> add(r.processId, Math.max(r.start,t0), Math.min(r.end,t1)) );
+    for(const code in state.active){ const ses=state.active[code]; add(ses.processId, Math.max(ses.start,t0), Math.min(nowMs(),t1)); }
+    return {prod, non};
+  }
+
+  // Update wykresów — dzienne
+  function updateCharts(){
+    initChartProc(); initChartAvg(); initChartPie();
+    const t0=startOfBusinessDayMs(), t1=nowMs();
+
+    const totalsRaw=computeProcessTotalsRawForCharts(t0,t1);
+    const barProcs=['Hafty','Zgrzewy','Szycie'];
+    chartProc.data.datasets[0].data = barProcs.map(n=>{ const pid=pidByName(n); return pid? (totalsRaw.get(pid)||0) : 0; });
+    chartProc.update();
+
+    const avgMap=computeAvgPercentPerProcessInRange(t0,t1);
+    const avgLabels=['Hafty','Zgrzewy','Szycie','Placement','Personal packaging'];
+    chartAvg.data.labels = avgLabels;
+    chartAvg.data.datasets[0].data = avgLabels.map(n=>{ const pid=pidByName(n); return pid? Math.round((avgMap.get(pid)||0)*10)/10 : 0; });
+    chartAvg.update();
+
+    const {prod, non} = computeProductivityDurations(t0,t1);
+    const total = prod + non;
+    const pctP = total>0 ? (prod/total)*100 : 0;
+    const pctN = total>0 ? (non/total)*100 : 0;
+    chartPie.data.datasets[0].data = [ +(pctP.toFixed(1)), +(pctN.toFixed(1)) ];
+    chartPie.update();
+  }
+
+  // Update wykresów — tydzień roboczy Pn–Pt
+  function updateChartsWeekly(){
+    initChartProcW(); initChartAvgW(); initChartPieW();
+    const {t0, t1} = getWeekMonFriWindow();
+
+    const totalsRaw=computeProcessTotalsRawForCharts(t0,t1);
+    const barProcs=['Hafty','Zgrzewy','Szycie'];
+    chartProcW.data.datasets[0].data = barProcs.map(n=>{ const pid=pidByName(n); return pid? (totalsRaw.get(pid)||0) : 0; });
+    chartProcW.update();
+
+    const avgMap=computeAvgPercentPerProcessInRange(t0,t1);
+    const avgLabels=['Hafty','Zgrzewy','Szycie','Placement','Personal packaging'];
+    chartAvgW.data.labels = avgLabels;
+    chartAvgW.data.datasets[0].data = avgLabels.map(n=>{ const pid=pidByName(n); return pid? Math.round((avgMap.get(pid)||0)*10)/10 : 0; });
+    chartAvgW.update();
+
+    const {prod, non} = computeProductivityDurations(t0,t1);
+    const total = prod + non;
+    const pctP = total>0 ? (prod/total)*100 : 0;
+    const pctN = total>0 ? (non/total)*100 : 0;
+    chartPieW.data.datasets[0].data = [ +(pctP.toFixed(1)), +(pctN.toFixed(1)) ];
+    chartPieW.update();
+  }
+
+  // Admin update + Settings UI
+  function setMinSegControlsEnabled(en){
+    if(els.minSegRange) els.minSegRange.disabled = !en;
+    if(els.minSegNumber) els.minSegNumber.disabled = !en;
+    if(els.btnSaveMinSeg) els.btnSaveMinSeg.disabled = !en;
+  }
+  function updateSettingsUI(){
+    if(els.dailyResetTime) els.dailyResetTime.value = parseResetHHmm();
+    const curMinSeg=+state.config.minSegSec||60;
+    if(els.minSegRange){ els.minSegRange.value=String(curMinSeg); }
+    if(els.minSegNumber){ els.minSegNumber.value=String(curMinSeg); }
+    if(els.minSegValue){ els.minSegValue.textContent=String(curMinSeg); }
+    const mode=state.config.allocMode||'proportional';
+    if(els.allocModeProportional) els.allocModeProportional.checked = (mode!=='full');
+    if(els.allocModeFull) els.allocModeFull.checked = (mode==='full');
+    setMinSegControlsEnabled(mode!=='full');
+
+    // auto-logout i przerwy
+    if(els.autoLogoutTime) els.autoLogoutTime.value = isValidHHmm(state.config.autoLogoutHHmm)?state.config.autoLogoutHHmm:'';
+    if(els.break1StartTime) els.break1StartTime.value = isValidHHmm(state.config.break1StartHHmm)?state.config.break1StartHHmm:'';
+    if(els.break1EndTime) els.break1EndTime.value = isValidHHmm(state.config.break1EndHHmm)?state.config.break1EndHHmm:'';
+    if(els.break2StartTime) els.break2StartTime.value = isValidHHmm(state.config.break2StartHHmm)?state.config.break2StartHHmm:'';
+    if(els.break2EndTime) els.break2EndTime.value = isValidHHmm(state.config.break2EndHHmm)?state.config.break2EndHHmm:'';
+
+    // Odświeżanie aplikacji
+    if(els.refreshIntervalRange) els.refreshIntervalRange.value = String(state.config.refreshIntervalMin||1);
+    if(els.refreshIntervalNumber) els.refreshIntervalNumber.value = String(state.config.refreshIntervalMin||1);
+    if(els.refreshIntervalValue) els.refreshIntervalValue.textContent = String(state.config.refreshIntervalMin||1);
+
+    // Walidacja zlecenia
+    const vmode = state.config.orderValidationMode || 'warn';
+    if(els.ordValWarn) els.ordValWarn.checked = (vmode!=='block');
+    if(els.ordValBlock) els.ordValBlock.checked = (vmode==='block');
+
+    // Liczba stanowisk
+    const sc = clamp(+state.config.stationCount||30,1,30);
+    if(els.stationCountRange) els.stationCountRange.value=String(sc);
+    if(els.stationCountNumber) els.stationCountNumber.value=String(sc);
+    if(els.stationCountValue) els.stationCountValue.textContent=String(sc);
+  }
+  function updateAdminAll(){
+    updateAdminEmployees(); updateAdminProcesses(); updateAdminStations(); updateAdminActive(); updateAdminLogs();
+    updateImportUI(); updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly(); updateSettingsUI();
+    if(currentModOrder) updateOrderModsTable(currentModOrder);
+  }
+  function updateAll(){ updateStationSelect(); updateActivePublic(); updateCurrentOrders(); if(isAdmin) updateAdminAll(); }
+
+  function tick(){
+    if(!isAdmin) return;
+    const now=nowMs();
+    document.querySelectorAll('#tblActiveAdmin td.elapsed').forEach(td=>{
+      const s=+td.getAttribute('data-start')||0;
+      const windows=buildBreakWindowsForRange(s, now);
+      const sec=secMinusWindows(s, now, windows);
+      td.textContent=fmtHMS(sec);
+    });
+    if(now - lastWeeklyUpdate > 5000){ updateWeeklyResultsUI(); lastWeeklyUpdate = now; }
+  }
+
+  // Modyfikacja zleceń (UI i obsługa)
+  function pctOptionsHtml(sel){ const vals=[-50,-40,-30,-20,-10,0,10,20,30,40,50]; return vals.map(v=>`<option value="${v}" ${(+sel)===v?'selected':''}>${v>0?'+':''}${v}%</option>`).join(''); }
+  function updateOrderModsTable(ord){
+    const tbody=els.tblOrderMods; tbody.innerHTML=''; if(!ord) return;
+    const row=(state.importData.rows||{})[ord]; if(!row){ showMsg(els.modMsg,`Brak zlecenia ${ord} w danych importu.`,'error',false); return; }
+    const pids=Object.keys(row).map(Number).filter(n=>Number.isFinite(n)&&row[n]>0).sort((a,b)=>processName(a).localeCompare(processName(b)));
+    if(!pids.length){ showMsg(els.modMsg,`Zlecenie ${ord} ma zerowe ilości.`,'error',false); return; }
+    showMsg(els.modMsg, `Edycja zlecenia ${ord}.`, 'success', false);
+    pids.forEach(pid=>{
+      const base=+row[pid]||0, pct=+((state.orderMods[ord]||{})[pid]||0), adj=base*(1+pct/100);
+      const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHtml(processName(pid))}</td><td>${fmtQty(base)}</td><td><select data-mod-pid="${pid}">${pctOptionsHtml(pct)}</select></td><td data-mod-result="${pid}">${fmtQty(adj)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function findOrderAndShow(){
+    const ord=canonOrder(els.modOrderInput.value); if(!ord){ showMsg(els.modMsg,'Wpisz poprawny numer (7–10 cyfr).','error',false); return; }
+    currentModOrder=ord; updateOrderModsTable(ord); updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+  }
+
+  // Raporty / eksporty
+  $('#tblActiveAdmin').addEventListener('click',e=>{ const b=e.target.closest('button[data-action="force-logout"]'); if(!b) return; const code=b.getAttribute('data-code'); doLogout(code); });
+  function downloadCSV(csv,prefix){ const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); const d=new Date(); const fname=`${prefix}_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours())}-${String(d.getMinutes())}.csv`; a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); URL.revokeObjectURL(a.href); a.remove(); }
+  function exportCSV_TimeOrders(){
+    const sep=';', agg=new Map(), key=(c,p)=>`${c}|${p}`, ensure=(c,p)=>{const k=key(c,p); if(!agg.has(k)) agg.set(k,{code:c,pid:p,time:0,orders:new Set()}); return agg.get(k);};
+
+    for(const r of state.logs){ const rec=ensure(r.code,r.processId); rec.time+=+r.durationSec||0; }
+    const now=nowMs(); for(const code in state.active){ const ses=state.active[code]; const rec=ensure(code,ses.processId); rec.time+=Math.max(0,Math.floor((now-ses.start)/1000)); }
+
+    const dayStart = startOfCalendarDayMs();
+    const dayEnd   = endOfCalendarDayMs();
+    for(const o of state.orders){
+      if(o.ts==null || o.ts<dayStart || o.ts>dayEnd) continue;
+      if(!isOrderOk(onlyDigits(o.order))) continue;
+      const rec=ensure(o.code,o.processId);
+      rec.orders.add(o.order);
+    }
+
+    const rows=Array.from(agg.values()).sort((a,b)=>+a.code-+b.code||processName(a.pid).localeCompare(processName(b.pid)));
+    if(!rows.length){ alert('Brak danych do eksportu.'); return; }
+    const header=['kod','pracownik','proces','czas_s','czas_hms','zlecenie'].join(sep), lines=[];
+    rows.forEach(r=>{
+      const emp=state.employees[r.code]?.name||'', proc=processName(r.pid), orders=Array.from(r.orders).sort();
+      if(!orders.length) lines.push([r.code, emp, proc, r.time, fmtHMS(r.time), ''].join(sep));
+      else orders.forEach(ord=>lines.push([r.code, emp, proc, r.time, fmtHMS(r.time), ord].join(sep)));
+    });
+    downloadCSV([header,...lines].join('\n'),'raport_czas_zlecenia');
+  }
+
+  // Events — public
+  els.btnLogin.addEventListener('click',doLogin);
+  els.btnLogout.addEventListener('click',()=>doLogout(null));
+  els.btnClearCode.addEventListener('click',()=>{ els.code.value=''; els.code.focus(); });
+  els.code.addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+  els.code.addEventListener('input',()=>{ els.code.value=onlyDigits(els.code.value).slice(0,3); });
+
+  // Orders
+  els.btnAddOrder.addEventListener('click',addOrder);
+  els.btnClearOrder.addEventListener('click',()=>{ els.ordEmpCode.value=''; els.ordNumber.value=''; els.ordEmpCode.focus(); });
+  els.btnClearActiveOrder.addEventListener('click', clearActiveOrder);
+  els.ordEmpCode.addEventListener('input',()=>{ els.ordEmpCode.value=onlyDigits(els.ordEmpCode.value).slice(0,3); });
+  els.ordNumber.addEventListener('input',()=>{ els.ordNumber.value=onlyDigits(els.ordNumber.value).slice(0,10); });
+  els.ordNumber.addEventListener('keydown',e=>{ if(e.key==='Enter') addOrder(); });
+
+  // Import events
+  els.btnImport.addEventListener('click', doImportFile);
+  els.btnClearImport.addEventListener('click', clearImportData);
+
+  // Modal admin
+  function openAdminModal() {
+    els.adminLoginMsg.classList.remove('show');
+    els.adminPinInput.value = '';
+    els.adminLoginModal.classList.add('show');
+    els.adminLoginModal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => els.adminPinInput.focus(), 50);
+  }
+  function closeAdminModal() {
+    els.adminLoginModal.classList.remove('show');
+    els.adminLoginModal.setAttribute('aria-hidden', 'true');
+  }
+  function tryAdminLogin() {
+    const pin = els.adminPinInput.value || '';
+    if (!pin) { showMsg(els.adminLoginMsg, 'Wpisz PIN.', 'error', false); return; }
+    const ok = simpleHash(pin) === state.config.adminPinHash;
+    if (!ok) { showMsg(els.adminLoginMsg, 'Nieprawidłowy PIN.', 'error', false); return; }
+    closeAdminModal();
+    showAdminUI(true);
+  }
+  els.btnOpenAdmin.addEventListener('click', openAdminModal);
+  els.btnAdminCancel.addEventListener('click', closeAdminModal);
+  els.btnAdminLogin.addEventListener('click', tryAdminLogin);
+  els.adminPinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryAdminLogin(); });
+  els.btnAdminLogout.addEventListener('click', ()=>showAdminUI(false));
+
+  // Admin tabs
+  els.tabButtons.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      els.tabButtons.forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+      const target=btn.getAttribute('data-tab'); document.querySelectorAll('.admin-section').forEach(sec=>sec.classList.toggle('active', sec.id===target));
+      if(isAdmin) updateAdminAll();
+    });
+  });
+
+  // Employees events
+  els.btnAddEmployee.addEventListener('click',()=>{
+    const n=clamp(parseInt(els.newEmpCode.value,10)||0,0,999), code=(Number.isFinite(n)&&n>=1&&n<=999)?String(n):null, name=(els.newEmpName.value||'').trim();
+    if(!code){ alert('Kod 1–999.'); return; } if(!name){ alert('Podaj imię i nazwisko.'); return; } if(state.employees[code]){ alert('Taki kod już istnieje.'); return; }
+    state.employees[code]={name,active:true}; els.newEmpCode.value=''; els.newEmpName.value=''; saveState(); updateAdminEmployees();
+  });
+  $('#tblEmployees').addEventListener('input',e=>{ const inp=e.target; if(inp.hasAttribute('data-emp-name')){ const code=inp.getAttribute('data-emp-name'); if(state.employees[code]){ state.employees[code].name=inp.value; saveState(); } } });
+  $('#tblEmployees').addEventListener('change',e=>{ const inp=e.target; if(inp.hasAttribute('data-emp-active')){ const code=inp.getAttribute('data-emp-active'); if(state.employees[code]){ state.employees[code].active=inp.checked; saveState(); } } });
+  $('#tblEmployees').addEventListener('click',e=>{ const b=e.target.closest('button[data-action="del-emp"]'); if(!b) return; const code=b.getAttribute('data-code'); if(!canDeleteEmployee(code)){ alert('Nie można usunąć: zalogowany.'); return; } if(!confirm(`Usunąć ${code}?`)) return; delete state.employees[code]; saveState(); updateAdminEmployees(); updateAll(); });
+
+  // Processes events
+  $('#tblProcesses').addEventListener('input',e=>{ const inp=e.target; if(!inp.hasAttribute('data-proc-name')) return; const id=+inp.getAttribute('data-proc-name'); const p=processById(id); if(p){ p.name=inp.value||''; saveState(); updateAdminStations(); updateStationSelect(); updateAdminActive(); updateAdminLogs(); updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly(); updateNormsTable(); } });
+  els.btnAddProcess.addEventListener('click',()=>{ const name=(els.newProcName.value||'').trim(); if(!name){ alert('Podaj nazwę procesu.'); return; } if(state.processes.some(p=>p.name.toLowerCase()===name.toLowerCase())){ alert('Proces już istnieje.'); return; } const id=Math.max(0,...state.processes.map(p=>+p.id||0))+1; state.processes.push({id,name}); els.newProcName.value=''; saveState(); updateAdminProcesses(); updateAdminStations(); updateStationSelect(); updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly(); updateNormsTable(); });
+  $('#tblProcesses').addEventListener('click',e=>{ const b=e.target.closest('button[data-action="del-proc"]'); if(!b) return; const id=+b.getAttribute('data-proc'); const used=usageCountForProcess(id); if(used>0){ alert('Nie można usunąć — proces przypisany do stanowisk.'); return; } if(state.processes.length<=1){ alert('Musi istnieć co najmniej jeden proces.'); return; } if(!confirm('Usunąć proces?')) return; state.processes=state.processes.filter(p=>p.id!==id); saveState(); updateAdminProcesses(); updateAdminStations(); updateStationSelect(); updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly(); updateNormsTable(); });
+
+  // Stations events
+  $('#tblStations').addEventListener('input',e=>{
+    const inp=e.target;
+    if(inp.hasAttribute('data-st-name')){
+      const id=+inp.getAttribute('data-st-name'); const s=stationById(id);
+      if(s){ s.name=inp.value; saveState(); updateAll(); }
+    }
+    if(inp.hasAttribute('data-st-capacity')){
+      const id=+inp.getAttribute('data-st-capacity'); const s=stationById(id);
+      if(s){
+        let v=Math.max(1, parseInt(inp.value,10)||1);
+        const used = Object.values(state.active).filter(x=>x.stationId===id).length;
+        if(v < used){ v = used; }
+        s.capacity = v; inp.value = String(v);
+        saveState(); updateAll();
+      }
+    }
+  });
+  $('#tblStations').addEventListener('change',e=>{
+    const inp=e.target;
+    if(inp.hasAttribute('data-st-process')){
+      const id=+inp.getAttribute('data-st-process'); const s=stationById(id);
+      if(s){
+        s.processId = +inp.value;
+        for(const code in state.active){
+          if(state.active[code].stationId===id){
+            state.active[code].processId = s.processId;
+          }
+        }
+        saveState();
+        updateStationSelect(); updateAdminActive(); updateAdminLogs();
+        updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+      }
+    }
+    if(inp.hasAttribute('data-st-active')){
+      const id=+inp.getAttribute('data-st-active'); const s=stationById(id);
+      if(s){ s.active = inp.checked; saveState(); updateAll(); }
+    }
+  });
+  els.btnStationsReset.addEventListener('click',()=>{
+    if(!confirm('Przywrócić domyślne nazwy i limity?')) return;
+    const keepActive=new Map(state.stations.map(s=>[s.id,s.active]));
+    const keepProc=new Map(state.stations.map(s=>[s.id,s.processId]));
+    state.stations = defaultStations().map(s=>({
+      ...s,
+      active: keepActive.get(s.id) ?? true,
+      processId: keepProc.get(s.id) ?? (state.processes[0]?.id||1)
+    }));
+    saveState(); updateAll();
+  });
+
+  // Ustawienia — zapisy
+  els.btnSaveResetTime?.addEventListener('click', ()=>{
+    const v=(els.dailyResetTime?.value||'').trim();
+    if(!isValidHHmm(v)){ alert('Podaj poprawną godzinę w formacie HH:MM'); return; }
+    state.config.dailyResetHHmm=v; saveState();
+    lastBusinessStart = startOfBusinessDayMs();
+    updateResultsUI(); updateCharts();
+    alert('Zapisano godzinę resetu.');
+  });
+
+  function syncMinSegDisplays(val){
+    if(els.minSegRange) els.minSegRange.value=String(val);
+    if(els.minSegNumber) els.minSegNumber.value=String(val);
+    if(els.minSegValue) els.minSegValue.textContent=String(val);
+  }
+  els.minSegRange?.addEventListener('input', ()=>{ const v=+els.minSegRange.value||0; syncMinSegDisplays(v); });
+  els.minSegNumber?.addEventListener('input', ()=>{ let v=+els.minSegNumber.value||0; v=clamp(v,0,3600); syncMinSegDisplays(v); });
+  els.btnSaveMinSeg?.addEventListener('click', ()=>{
+    let v=+els.minSegNumber.value||+els.minSegRange.value||60; v=clamp(v,0,3600);
+    state.config.minSegSec=v; saveState(); updateResultsUI(); updateCharts(); updateChartsWeekly();
+    alert('Zapisano próg minimalny.');
+  });
+  function applyAllocModeUI(){
+    const mode = els.allocModeFull?.checked ? 'full' : 'proportional';
+    setMinSegControlsEnabled(mode!=='full');
+  }
+  els.allocModeProportional?.addEventListener('change', applyAllocModeUI);
+  els.allocModeFull?.addEventListener('change', applyAllocModeUI);
+  els.btnSaveAllocMode?.addEventListener('click', ()=>{
+    const mode = els.allocModeFull?.checked ? 'full' : 'proportional';
+    state.config.allocMode = mode;
+    saveState();
+    updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+    alert('Zapisano tryb przydzielania ilości.');
+  });
+
+  els.btnSaveAutoLogout?.addEventListener('click', ()=>{
+    const v=(els.autoLogoutTime?.value||'').trim();
+    if(v && !isValidHHmm(v)){ alert('Podaj poprawną godzinę w formacie HH:MM'); return; }
+    state.config.autoLogoutHHmm = v || '';
+    fired.autoLogout = '';
+    saveState();
+    alert('Zapisano godzinę auto wylogowania.');
+  });
+
+  els.btnSaveBreakTimes?.addEventListener('click', ()=>{
+    const b1s=(els.break1StartTime?.value||'').trim();
+    const b1e=(els.break1EndTime?.value||'').trim();
+    const b2s=(els.break2StartTime?.value||'').trim();
+    const b2e=(els.break2EndTime?.value||'').trim();
+
+    function okPair(s,e){ return (!s && !e) || (isValidHHmm(s) && isValidHHmm(e) && s<e); }
+    if(!okPair(b1s,b1e)){ alert('Przerwa 1: podaj obie godziny (HH:MM) i upewnij się, że początek < koniec, lub zostaw oba puste.'); return; }
+    if(!okPair(b2s,b2e)){ alert('Przerwa 2: podaj obie godziny (HH:MM) i upewnij się, że początek < koniec, lub zostaw oba puste.'); return; }
+
+    state.config.break1StartHHmm = b1s && b1e ? b1s : '';
+    state.config.break1EndHHmm   = b1s && b1e ? b1e : '';
+    state.config.break2StartHHmm = b2s && b2e ? b2s : '';
+    state.config.break2EndHHmm   = b2s && b2e ? b2e : '';
+
+    saveState();
+    updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+    alert('Zapisano przerwy (zamrożenie czasu).');
+  });
+
+  // Odświeżanie aplikacji
+  function syncRefreshControls(val){
+    val = clamp(+val||1,1,10);
+    if(els.refreshIntervalRange) els.refreshIntervalRange.value = String(val);
+    if(els.refreshIntervalNumber) els.refreshIntervalNumber.value = String(val);
+    if(els.refreshIntervalValue) els.refreshIntervalValue.textContent = String(val);
+  }
+  function applyRefreshInterval(){
+    if(appRefreshTimerId) clearInterval(appRefreshTimerId);
+    const min = clamp(+state.config.refreshIntervalMin||1,1,10);
+    appRefreshTimerId = setInterval(()=>{
+      updateAll();
+      updateResultsUI();
+      updateWeeklyResultsUI();
+      updateCharts();
+      updateChartsWeekly();
+    }, min*60*1000);
+  }
+  els.refreshIntervalRange?.addEventListener('input', ()=> syncRefreshControls(els.refreshIntervalRange.value));
+  els.refreshIntervalNumber?.addEventListener('input', ()=> syncRefreshControls(els.refreshIntervalNumber.value));
+  els.btnSaveRefreshInterval?.addEventListener('click', ()=>{
+    const v = clamp(+els.refreshIntervalNumber.value || +els.refreshIntervalRange.value || 1, 1, 10);
+    state.config.refreshIntervalMin = v;
+    saveState();
+    applyRefreshInterval();
+    alert('Zapisano częstotliwość odświeżania.');
+  });
+
+  // Walidacja zlecenia względem importu — zapis
+  els.btnSaveOrderValidation?.addEventListener('click', ()=>{
+    const mode = (els.ordValBlock?.checked ? 'block' : 'warn');
+    state.config.orderValidationMode = mode;
+    saveState();
+    alert('Zapisano tryb walidacji zlecenia.');
+  });
+
+  // Liczba stanowisk (1–30)
+  function syncStationCountControls(val){
+    val = clamp(+val||30,1,30);
+    if(els.stationCountRange) els.stationCountRange.value = String(val);
+    if(els.stationCountNumber) els.stationCountNumber.value = String(val);
+    if(els.stationCountValue) els.stationCountValue.textContent = String(val);
+  }
+  function applyStationCount(newCount){
+    const N = clamp(+newCount||30,1,30);
+    const curN = state.stations.length;
+    if(N === curN){
+      state.config.stationCount = N; saveState(); updateAll();
+      alert('Zapisano liczbę stanowisk.');
+      return;
+    }
+    if(N < curN){
+      const blocked = Object.values(state.active).some(s=>s.stationId > N);
+      if(blocked){
+        alert('Nie można zmniejszyć liczby stanowisk — ktoś jest zalogowany na stanowisku powyżej nowego limitu.');
+        syncStationCountControls(curN);
+        return;
+      }
+    }
+    const fallbackPid = state.processes[0]?.id || 1;
+    const byId=new Map(state.stations.map(s=>[s.id,s]));
+    const newStations=[];
+    for(let i=1;i<=N;i++){
+      if(byId.has(i)) newStations.push({...byId.get(i), id:i});
+      else newStations.push({id:i,name:`Stanowisko ${i}`,processId:fallbackPid,capacity:1,active:true});
+    }
+    state.stations = newStations;
+    state.config.stationCount = N;
+    saveState();
+    updateAll();
+    alert('Zastosowano nową liczbę stanowisk.');
+  }
+  els.stationCountRange?.addEventListener('input', ()=> syncStationCountControls(els.stationCountRange.value));
+  els.stationCountNumber?.addEventListener('input', ()=> syncStationCountControls(els.stationCountNumber.value));
+  els.btnSaveStationCount?.addEventListener('click', ()=>{
+    const v = clamp(+els.stationCountNumber.value || +els.stationCountRange.value || 30, 1, 30);
+    applyStationCount(v);
+  });
+
+  // Zmiana PIN
+  els.btnChangePin.addEventListener('click', ()=>{
+    const cur=els.pinCurrent.value||'';
+    const n1=els.pinNew.value||'';
+    const n2=els.pinNew2.value||'';
+    if(simpleHash(cur)!==state.config.adminPinHash){ alert('Błędny obecny PIN.'); return; }
+    if(!n1 || n1!==n2){ alert('Nowy PIN musi być podany dwukrotnie i identycznie.'); return; }
+    state.config.adminPinHash = simpleHash(n1);
+    saveState();
+    els.pinCurrent.value=''; els.pinNew.value=''; els.pinNew2.value='';
+    alert('PIN administratora został zmieniony.');
+  });
+
+  // Modyfikacja zleceń — events
+  els.btnModFind.addEventListener('click', findOrderAndShow);
+  $('#tblOrderMods').addEventListener('change', e=>{
+    const sel=e.target;
+    if(!sel.hasAttribute('data-mod-pid')) return;
+    if(!currentModOrder) return;
+    const pid=+sel.getAttribute('data-mod-pid');
+    const pct=+sel.value || 0;
+    state.orderMods[currentModOrder] = state.orderMods[currentModOrder] || {};
+    state.orderMods[currentModOrder][pid] = pct;
+    saveState();
+
+    const base = ((state.importData.rows||{})[currentModOrder]||{})[pid] || 0;
+    const adj = base*(1+pct/100);
+    const cell = els.tblOrderMods.querySelector(`[data-mod-result="${pid}"]`);
+    if(cell) cell.textContent = fmtQty(adj);
+
+    updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+  });
+  els.btnModSave.addEventListener('click', ()=>{
+    if(!currentModOrder){ showMsg(els.modMsg,'Wyszukaj zlecenie.','error',false); return; }
+    saveState();
+    showMsg(els.modMsg, `Zapisano korekty dla zlecenia ${currentModOrder}.`, 'success', true);
+  });
+  els.btnModClearOrder.addEventListener('click', ()=>{
+    if(!currentModOrder){ showMsg(els.modMsg,'Wyszukaj zlecenie.','error',false); return; }
+    delete state.orderMods[currentModOrder];
+    saveState();
+    updateOrderModsTable(currentModOrder);
+    updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+    showMsg(els.modMsg, `Wyczyszczono korekty dla zlecenia ${currentModOrder}.`, 'success', true);
+  });
+  els.btnModClearAll.addEventListener('click', ()=>{
+    if(!confirm('Usunąć wszystkie korekty?')) return;
+    state.orderMods={};
+    saveState();
+    if(currentModOrder) updateOrderModsTable(currentModOrder);
+    updateResultsUI(); updateWeeklyResultsUI(); updateCharts(); updateChartsWeekly();
+    showMsg(els.modMsg, 'Wyczyszczono wszystkie korekty.', 'success', true);
+  });
+
+  // Eksporty + czyszczenie
+  els.btnExport?.addEventListener('click', exportCSV_TimeOrders);
+  els.btnExportWeekly?.addEventListener('click', exportCSV_WeeklyResults);
+  els.btnClearAll?.addEventListener('click', ()=>{
+    if(!confirm('Usunąć WSZYSTKIE dane (sesje, sumy, historia, zlecenia)?')) return;
+    clearAllData();
+  });
+
+  // Harmonogram auto wylogowania (raz dziennie)
+  function checkScheduledAutoLogout(){
+    const hhmm = state.config.autoLogoutHHmm || '';
+    if(!isValidHHmm(hhmm)) return;
+    const now = nowMs();
+    const tgt = todayAtMs(hhmm);
+    if(tgt==null) return;
+    const today = dayKey(now);
+    if(now >= tgt && fired.autoLogout !== today){
+      logoutAllNow();
+      fired.autoLogout = today;
+    }
+  }
+
+  // Monitor zmiany dnia roboczego i doby
+  function checkBusinessWindowChange(){
+    const t0=startOfBusinessDayMs();
+    if(lastBusinessStart==null){ lastBusinessStart=t0; return; }
+    if(t0!==lastBusinessStart){
+      lastBusinessStart=t0;
+      updateResultsUI(); updateCharts();
+    }
+  }
+  function checkCalendarDayChange(){
+    const t0=startOfCalendarDayMs();
+    if(lastCalendarStart==null){ lastCalendarStart=t0; return; }
+    if(t0!==lastCalendarStart){
+      lastCalendarStart=t0;
+      updateAdminLogs();
+      fired.autoLogout='';
+    }
+  }
+
+  // Start
+  loadState();
+  updateAll();
+  lastBusinessStart = startOfBusinessDayMs();
+  lastCalendarStart = startOfCalendarDayMs();
+  setInterval(()=>{ if(isAdmin) tick(); },1000);
+  setInterval(checkBusinessWindowChange, 30000);
+  setInterval(checkCalendarDayChange, 30000);
+  setInterval(checkScheduledAutoLogout, 15000);
+  applyRefreshInterval();
+})();
+</script>
+</body>
+</html>
