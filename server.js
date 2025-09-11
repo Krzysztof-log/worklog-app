@@ -189,7 +189,32 @@ app.post("/api/config", verifyAdmin, (req, res) => {
     }
   );
 });
+// ============================================================================================
+// 🟢 Endpoint: Lista aktywnie zalogowanych pracowników
+// zwraca sesje z tabeli "sessions", które nie mają end_time (czyli jeszcze trwają)
+app.get("/api/active", (req, res) => {
+  db.all(`SELECT * FROM sessions WHERE end_time IS NULL`, (err, rows) => {
+    if (err) return res.status(400).json({ error: err.message });
+    res.json(rows);
+  });
+});
 
+// ============================================================================================
+// 🟠 Endpoint: Historia logowań z bieżącego dnia (od północy)
+app.get("/api/logs", (req, res) => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0); // godzina 00:00 dziś
+  const startTs = todayStart.getTime();
+
+  db.all(
+    `SELECT * FROM sessions WHERE start_time >= ? ORDER BY start_time DESC`,
+    [startTs],
+    (err, rows) => {
+      if (err) return res.status(400).json({ error: err.message });
+      res.json(rows);
+    }
+  );
+});
 // ====== start serwera =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
