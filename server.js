@@ -8,16 +8,14 @@ const bodyParser = require("body-parser");
 
 const app = express();
 const db = new sqlite3.Database("./database.db");
-
-// Sekret JWT
 const SECRET = "sekret_super_haslo";
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static("public")); // serwuje Twój frontend
+app.use(express.static("public"));
 
-// ===== Inicjalizacja bazy =====
+// ========== INICJALIZACJA BAZY ==========
+
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS employees (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,30 +60,30 @@ db.serialize(() => {
     value TEXT
   )`);
 
-  // PIN admina "0000" domyślnie
+  // PIN admina - domyślnie "0000"
   db.get(`SELECT value FROM config WHERE key="adminPin"`, (err, row) => {
     if (!row) {
       const hash = bcrypt.hashSync("0000", 10);
       db.run(`INSERT INTO config(key,value) VALUES("adminPin",?)`, hash);
-      console.log("✅ Ustawiono domyślny PIN admina: 0000");
+      console.log("✅ PIN admina ustawiony na: 0000");
     }
   });
 });
 
-// ===== Middleware uwierzytelniania admina =====
+// ========== AUTH MIDDLEWARE ==========
 function verifyAdmin(req, res, next) {
   const token = req.headers["authorization"]?.split(" ")[1];
   if (!token) return res.status(401).json({ error: "Brak tokenu" });
   jwt.verify(token, SECRET, (err, decoded) => {
-    if (err) return res.status(401).json({ error: "Błędny token" });
+    if (err) return res.status(401).json({ error: "Zły token" });
     req.admin = decoded;
     next();
   });
 }
 
-// ====== API ======
+// ========== ENDPOINTY ==========
 
-// 🔑 logowanie admina
+// 🔑 ADMIN
 app.post("/api/admin/login", (req, res) => {
   const { pin } = req.body;
   db.get(`SELECT value FROM config WHERE key="adminPin"`, (err, row) => {
@@ -93,130 +91,97 @@ app.post("/api/admin/login", (req, res) => {
       const token = jwt.sign({ role: "admin" }, SECRET, { expiresIn: "8h" });
       res.json({ token });
     } else {
-      res.status(401).json({ error: "Nieprawidłowy PIN" });
+      res.status(401).json({ error: "Błędny PIN" });
     }
   });
 });
 
-// 👷 Employees
+// 👷 PRACOWNICY
 app.get("/api/employees", (req, res) => {
-  db.all(`SELECT * FROM employees`, (err, rows) => res.json(rows));
+  db.all(`SELECT * FROM employees ORDER BY code ASC`, (err, rows) => res.json(rows));
 });
-
 app.post("/api/employees", verifyAdmin, (req, res) => {
   const { code, name } = req.body;
-  db.run(
-    `INSERT INTO employees(code,name,active) VALUES(?,?,1)`,
-    [code, name],
-    function (err) {
-      if (err) return res.status(400).json({ error: err.message });
-      res.json({ id: this.lastID, code, name, active: 1 });
-    }
-  );
+  db.run(`INSERT INTO employees(code,name,active) VALUES(?,?,1)`, [code, name], function(err){
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({ id: this.lastID, code, name, active: 1 });
+  });
+});
+app.patch("/api/employees/:code", verifyAdmin, (req, res) => {
+  const { name, active } = req.body;
+  db.run(`UPDATE employees SET name=?, active=? WHERE code=?`, [name, active?1:0, req.params.code], function(err){
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({ updated: this.changes });
+  });
+});
+app.delete("/api/employees/:code", verifyAdmin, (req, res) => {
+  db.run(`DELETE FROM employees WHERE code=?`, [req.params.code], function(err){
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({ deleted: this.changes });
+  });
 });
 
-// 🕔 Login pracownika
+// 🕒 SESJE
 app.post("/api/login", (req, res) => {
   const { code, stationId, processId } = req.body;
   const start = Date.now();
-  db.run(
-    `INSERT INTO sessions(employee_code,station_id,process_id,start_time) VALUES(?,?,?,?)`,
-    [code, stationId, processId, start],
-    function (err) {
-      if (err) return res.status(400).json({ error: err.message });
-      res.json({ session_id: this.lastID, start });
-    }
-  );
+  db.run(`INSERT INTO sessions(employee_code,station_id,process_id,start_time) VALUES(?,?,?,?)`, [code, stationId, processId, start], function(err){
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({ session_id: this.lastID, start });
+  });
 });
-
-// 🕔 Logout
 app.post("/api/logout", (req, res) => {
   const { code } = req.body;
   const end = Date.now();
-  db.get(
-    `SELECT * FROM sessions WHERE employee_code=? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1`,
-    [code],
-    (err, row) => {
-      if (!row) return res.status(404).json({ error: "Brak aktywnej sesji" });
-      const duration = Math.floor((end - row.start_time) / 1000);
-      db.run(
-        `UPDATE sessions SET end_time=?, duration_sec=? WHERE id=?`,
-        [end, duration, row.id],
-        () => res.json({ code, duration })
-      );
-    }
-  );
+  db.get(`SELECT * FROM sessions WHERE employee_code=? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1`, [code], (err, row)=>{
+    if (!row) return res.status(404).json({ error: "Brak aktywnej sesji" });
+    const duration = Math.floor((end-row.start_time)/1000);
+    db.run(`UPDATE sessions SET end_time=?, duration_sec=? WHERE id=?`, [end, duration, row.id], () => res.json({ code, duration }));
+  });
+});
+app.get("/api/active", (req,res)=>{
+  db.all(`SELECT * FROM sessions WHERE end_time IS NULL`, (err,rows)=> res.json(rows));
+});
+app.get("/api/logs", (req,res)=>{
+  const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+  db.all(`SELECT * FROM sessions WHERE start_time >= ? ORDER BY start_time DESC`, [startOfDay.getTime()], (err,rows)=> res.json(rows));
 });
 
-// 📦 Orders
-app.post("/api/orders", (req, res) => {
+// 📦 ZLECENIA
+app.post("/api/orders", (req,res)=>{
   const { code, processId, order } = req.body;
   const ts = Date.now();
-  db.run(
-    `INSERT INTO orders(employee_code,process_id,order_number,ts) VALUES(?,?,?,?)`,
-    [code, processId, order, ts],
-    function (err) {
-      if (err) return res.status(400).json({ error: err.message });
-      res.json({ id: this.lastID, ts });
-    }
-  );
-});
-
-app.get("/api/orders", (req, res) => {
-  db.all(`SELECT * FROM orders ORDER BY ts DESC LIMIT 50`, (err, rows) =>
-    res.json(rows)
-  );
-});
-
-// ⚙️ Config
-app.get("/api/config", (req, res) => {
-  db.all(`SELECT * FROM config`, (err, rows) => {
-    const out = {};
-    rows.forEach((r) => (out[r.key] = r.value));
-    res.json(out);
-  });
-});
-
-app.post("/api/config", verifyAdmin, (req, res) => {
-  const { key, value } = req.body;
-  db.run(
-    `INSERT INTO config(key,value) VALUES(?,?)
-     ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
-    [key, value],
-    (err) => {
-      if (err) return res.status(400).json({ error: err.message });
-      res.json({ key, value });
-    }
-  );
-});
-// ============================================================================================
-// 🟢 Endpoint: Lista aktywnie zalogowanych pracowników
-// zwraca sesje z tabeli "sessions", które nie mają end_time (czyli jeszcze trwają)
-app.get("/api/active", (req, res) => {
-  db.all(`SELECT * FROM sessions WHERE end_time IS NULL`, (err, rows) => {
+  db.run(`INSERT INTO orders(employee_code,process_id,order_number,ts) VALUES(?,?,?,?)`, [code,processId,order,ts], function(err){
     if (err) return res.status(400).json({ error: err.message });
-    res.json(rows);
+    res.json({id:this.lastID, order, ts});
+  });
+});
+app.get("/api/orders", (req,res)=>{
+  db.all(`SELECT * FROM orders ORDER BY ts DESC LIMIT 100`, (err,rows)=> res.json(rows));
+});
+
+// ⚙️ CONFIG
+app.get("/api/config", (req,res)=>{
+  db.all(`SELECT * FROM config`, (err,rows)=>{
+    const out={}; rows.forEach(r=> out[r.key]=r.value); res.json(out);
+  });
+});
+app.post("/api/config", verifyAdmin, (req,res)=>{
+  const {key,value}=req.body;
+  db.run(`INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, [key,value], (err)=>{
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({key,value});
   });
 });
 
-// ============================================================================================
-// 🟠 Endpoint: Historia logowań z bieżącego dnia (od północy)
-app.get("/api/logs", (req, res) => {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0); // godzina 00:00 dziś
-  const startTs = todayStart.getTime();
-
-  db.all(
-    `SELECT * FROM sessions WHERE start_time >= ? ORDER BY start_time DESC`,
-    [startTs],
-    (err, rows) => {
-      if (err) return res.status(400).json({ error: err.message });
-      res.json(rows);
-    }
-  );
+// 🔧 PROCESY / STACJE
+app.get("/api/processes", (req,res)=>{
+  db.all(`SELECT * FROM processes ORDER BY id ASC`, (err,rows)=> res.json(rows));
 });
-// ====== start serwera =====
+app.get("/api/stations", (req,res)=>{
+  db.all(`SELECT * FROM stations ORDER BY id ASC`, (err,rows)=> res.json(rows));
+});
+
+// ========== START ==========
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`✅ Serwer działa na http://localhost:${PORT}`)
-);
+app.listen(PORT, ()=> console.log(`✅ Serwer działa na porcie ${PORT}`));
